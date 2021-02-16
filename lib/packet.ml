@@ -1,6 +1,6 @@
 (** Magic numbers of the TLS protocol. *)
 
-(* HACK: 24 bits type not in cstruct *)
+(* HACK: 24 bits type not in cstruct, or 48 bits *)
 let get_uint24_len buf =
   (Cstruct.BE.get_uint16 buf 0) * 0x100 + (Cstruct.get_uint8 buf 2)
 

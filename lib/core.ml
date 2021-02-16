@@ -120,7 +120,7 @@ let tls_any_version_of_pair x =
   | Some v -> Some v
   | None ->
     match Dtls.Version.of_pair x with
-    Some v -> Some v 
+    | Some v -> Some v 
     | None  ->
       match x with
       | (3, 0) -> Some `SSL_3
@@ -150,7 +150,7 @@ type dtls_hdr = {
   content_type : Packet.content_type;
   version : any_version;
   epoch : int;                           (* Incremented on every cipher suite change *)
-  sequence_number : int;             (* DTLS handles out of order packets *)
+  sequence_number : int64;               (* DTLS handles out of order packets *)
 } [@@deriving sexp]
 
 type hdr = [`TLS of tls_hdr | `DTLS of dtls_hdr ] [@@deriving sexp]

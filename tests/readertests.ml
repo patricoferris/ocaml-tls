@@ -92,7 +92,7 @@ let good_record_parser (bytes, result) _ =
   | Error (Overflow x), `Overflow y -> assert_equal y x
   | Error (UnknownVersion x), `UnknownVersion y -> assert_equal y x
   | Error (UnknownContent x), `UnknownContent y -> assert_equal y x
-  | _ -> assert_failure "record parser broken"
+  | _ -> assert_failure "record parser broken!"
 
 let good_records =
   let open Core in
@@ -104,6 +104,9 @@ let good_records =
     ([ 22 ; 3 ; 3 ; 0 ; 0 ], `Record ((`TLS { content_type = HANDSHAKE ; version = `TLS_1_2 }, empty), empty) ) ;
     ([ 23 ; 3 ; 0 ; 0 ; 0 ], `Record ((`TLS { content_type = APPLICATION_DATA ; version = `SSL_3 }, empty), empty) ) ;
     ([ 24 ; 3 ; 4 ; 0 ; 0 ], `Record ((`TLS { content_type = HEARTBEAT ; version = `TLS_1_3 }, empty), empty) ) ;
+    ([ 24 ; 254 ; 255 ; 0 ; 10 ; 0 ; 0 ; 0 ; 0 ; 0 ; 10 ; 0 ; 0 ], `Record ((`DTLS { content_type = HEARTBEAT ; version = `DTLS_1_0; epoch = 10; sequence_number = 10L }, empty), empty) ) ;
+    ([ 24 ; 254 ; 253 ; 0 ; 0 ; 0 ; 0 ; 0 ; 0 ; 0 ; 0 ; 0 ; 0 ], `Record ((`DTLS { content_type = HEARTBEAT ; version = `DTLS_1_2; epoch = 0; sequence_number = 0L }, empty), empty) ) ;
+    ([ 24 ; 254 ; 253 ; 0 ; 10 ; 0 ; 0 ; 0 ; 0 ; 0 ; 10 ; 0 ; 0 ], `Record ((`DTLS { content_type = HEARTBEAT ; version = `DTLS_1_2; epoch = 10; sequence_number = 10L }, empty), empty) ) ;
     ([ 16 ; 3 ; 1 ; 0 ; 0 ], `UnknownContent 16 ) ;
     ([ 19 ; 3 ; 1 ; 0 ; 0 ], `UnknownContent 19 ) ;
     ([ 20 ; 5 ; 1 ; 0 ; 0 ], `UnknownVersion (5, 1) ) ;
@@ -111,8 +114,17 @@ let good_records =
     ([ 0 ], `Fragment (list_to_cstruct [ 0 ])) ;
     ([ ], `Fragment empty) ;
     ([ 20 ; 3 ; 1 ; 0 ; 0 ; 0 ], `Record ((`TLS { content_type = CHANGE_CIPHER_SPEC ; version = `TLS_1_0 }, empty), list_to_cstruct [ 0 ]) ) ;
-    ([ 0 ; 0 ; 0 ; 255 ; 255 ], `Overflow 65535) ;
-    ([ 0 ; 0 ; 0 ; 72 ; 1 ], `Overflow 18433)
+    ([ 0 ; 3 ; 1 ; 255 ; 255 ], `Overflow 65535) ;
+    ([ 0 ; 3 ; 2 ; 72 ; 1 ], `Overflow 18433) ; 
+    ([ 24 ; 254 ; 253 ; 0 ; 10 ; 0 ; 0 ; 0 ; 0 ; 0 ; 10 ; 255 ; 255 ], `Overflow 65535) ;
+    ([ 24 ; 254 ; 255 ; 0 ; 10 ; 0 ; 0 ; 0 ; 0 ; 0 ; 10 ; 72 ; 1 ], `Overflow 18433) ;
+    (* XXX patricoferris: I'm not sure these tests are correct -- these malformed headers should maybe raise
+       Unknown version rather than `Overflow? For DTLS we need to check where the length offset
+      is i.e. 11 bytes or 3 bytes so we will have to check the version before the length. If 
+      the version is not well-formed that gets raised before overflow? 
+        *)
+    (* ([ 0 ; 0 ; 0 ; 255 ; 255 ], `Overflow 65535) ; *)
+    (* ([ 0 ; 0 ; 0 ; 72 ; 1 ], `Overflow 18433) *)
 ]
 
 let good_records_tests =

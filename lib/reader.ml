@@ -57,30 +57,44 @@ let parse_version = catch parse_version_exn
 let parse_any_version = catch parse_any_version_exn
 
 let parse_record buf =
+  (* TLS `Record and DTLS `Record strictly greater than 4 bytes *)
   if len buf < 5 then
     return (`Fragment buf)
   else
     let typ = get_uint8 buf 0
     and version = parse_version_int (shift buf 1)
     in
-    match BE.get_uint16 buf 3 with
-    | x when x > (1 lsl 14 + 2048) ->
-      (* 2 ^ 14 + 2048 for TLSCiphertext
-         2 ^ 14 + 1024 for TLSCompressed
-         2 ^ 14 for TLSPlaintext *)
-      fail (Overflow x)
-    | x when 5 + x > len buf -> return (`Fragment buf)
-    | x ->
-      match
-        tls_any_version_of_pair version,
-        int_to_content_type typ
-      with
-      | None, _ -> fail (UnknownVersion version)
-      | _, None -> fail (UnknownContent typ)
-      | Some version, Some _ when Dtls.Version.is_dtls version -> fail (UnknownContent typ)
-      | Some version, Some content_type ->
-        let payload, rest = split ~start:5 buf x in
-        return (`Record ((`TLS { content_type ; version }, payload), rest))
+    (* Length offset differs depending on the TLS and DTLS *)
+    match tls_any_version_of_pair version with 
+    | None -> fail (UnknownVersion version)
+    | Some version -> 
+      let dtls = Dtls.Version.is_dtls version in 
+      let length_off = if dtls then 11 else 3 in 
+      match BE.get_uint16 buf length_off with
+      | x when x > (1 lsl 14 + 2048) ->
+        (* 2 ^ 14 + 2048 for TLSCiphertext
+          2 ^ 14 + 1024 for TLSCompressed
+          2 ^ 14 for TLSPlaintext *)
+        fail (Overflow x)
+      | x when 5 + x > len buf -> return (`Fragment buf)
+      | x ->
+        match
+          int_to_content_type typ
+        with
+        | None -> fail (UnknownContent typ)
+        | Some content_type ->
+          match dtls with 
+            | true ->
+              (* New DTLS fields: https://tools.ietf.org/html/rfc6347#section-4.1 *)
+              let epoch = BE.get_uint16 buf 3 in 
+              let sequence_number = Dtls.Utils.get_uint48 buf 5 in 
+              let payload, rest = split ~start:13 buf x in
+              let hdr_pay = (`DTLS { content_type ; version; epoch; sequence_number }, payload) in 
+              return (`Record (hdr_pay, rest))
+            | false -> 
+              let payload, rest = split ~start:5 buf x in
+              let hdr_pay = (`TLS { content_type ; version }, payload) in 
+              return (`Record (hdr_pay, rest))
 
 let validate_alert (lvl, typ) =
   let open Packet in

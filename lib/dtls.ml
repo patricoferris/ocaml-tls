@@ -30,10 +30,11 @@ module Version = struct
 end 
 
 module Utils = struct 
-  let get_uint48_len buf =
+  (* TODO: Check this works... *)
+  let get_uint48 buf off =
     Int64.(
       add
-        (mul (of_int32 @@ Cstruct.BE.get_uint32 buf 0) 0x10000L)
-        (Int64.of_int @@ Cstruct.BE.get_uint16 buf 4))
+        (mul (of_int32 @@ Cstruct.BE.get_uint32 buf (off)) 0x10000L)
+        (Int64.of_int @@ Cstruct.BE.get_uint16 buf (4 + off)))
 end 
 
