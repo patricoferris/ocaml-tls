@@ -15,6 +15,10 @@ type tls_before_13 = [
 
 type tls_version = [ tls13 | tls_before_13 ] [@@deriving sexp]
 
+let version_to_tls = function 
+  | #Dtls.Version.t as dtls -> Dtls.Version.tls_version dtls 
+  | #tls_version as tls -> tls
+
 let pair_of_tls_version = function
   | `TLS_1_0   -> (3, 1)
   | `TLS_1_1   -> (3, 2)
@@ -26,6 +30,11 @@ let compare_tls_version a b = match a, b with
   | `TLS_1_1, `TLS_1_1 -> 0 | `TLS_1_1, _ -> -1 | _, `TLS_1_1 -> 1
   | `TLS_1_2, `TLS_1_2 -> 0 | `TLS_1_2, _ -> -1 | _, `TLS_1_2 -> 1
   | `TLS_1_3, `TLS_1_3 -> 0
+
+let compare_tls_with_dtls_version a b = match a, b with 
+  | #tls_version, #tls_version as x -> compare_tls_version (fst x) (snd x)
+  | #Dtls.Version.t, #Dtls.Version.t as x -> Dtls.Version.compare (fst x) (snd x)
+  | _ -> failwith "Cannot compare mixed TLS and DTLS versions"
 
 let next = function
   | `TLS_1_0 -> Some `TLS_1_1
@@ -57,32 +66,75 @@ type tls_any_version = [
   | `TLS_1_X of int
 ] [@@deriving sexp]
 
+type tls_version_with_dtls = [ tls_version | Dtls.Version.t ][@@deriving sexp]
+
+let all_versions_dtls (min, max) = 
+  match min with 
+    | #Dtls.Version.t as min -> begin 
+      match max with 
+        | #Dtls.Version.t as max -> begin 
+          if min = `DTLS_1_0 && max = `DTLS_1_2 then [`DTLS_1_0; `DTLS_1_2] else [ min ]
+        end 
+        | _ -> failwith "Cannot mix TLS and DTLS Versions"
+    end
+    | #tls_version as min -> begin 
+      match max with 
+        | #tls_version as max -> (all_versions (min, max) :> tls_version_with_dtls list)
+        | _ -> failwith "Cannot mix TLS and DTLS Versions"
+    end 
+
+let pair_of_tls_version_with_dtls = function 
+  | #Dtls.Version.t as x -> Dtls.Version.to_pair x 
+  | #tls_version as t -> pair_of_tls_version t
+
+let tls_version_with_dtls_to_tls = function
+  | #Dtls.Version.t as t -> Dtls.Version.tls_version t
+  | #tls_version as v -> v
+
+type any_version = [ tls_any_version | Dtls.Version.t ] [@@deriving sexp]
+
 let any_version_to_version = function
   | #tls_version as v -> Some v
   | _ -> None
 
+let any_version_to_tls_version = function 
+  | #Dtls.Version.t as t -> Some (Dtls.Version.tls_version t)
+  | t -> any_version_to_version t 
+
 let version_eq a b =
-  match a with
-  | #tls_version as x -> compare_tls_version x b = 0
+  match a, b with
+  | #tls_version, #tls_version as x -> compare_tls_version (fst x) (snd x) = 0
+  | #Dtls.Version.t, #Dtls.Version.t as x -> Dtls.Version.compare (fst x) (snd x) = 0
   | _ -> false
 
-let version_ge a b =
-  match a with
-  | #tls_version as x -> compare_tls_version x b >= 0
-  | `SSL_3 -> false
-  | `TLS_1_X _ -> true
+let version_ge a (b : tls_version_with_dtls) =
+  match a, b with
+  | #tls_version, #tls_version as x -> compare_tls_version (fst x) (snd x) >= 0
+  | #Dtls.Version.t, #Dtls.Version.t as x -> Dtls.Version.compare (fst x) (snd x) >= 0
+  | `SSL_3, _ -> false
+  | `TLS_1_X _, _ -> true
+  | _ -> failwith "Cannot compare versions"
 
 let tls_any_version_of_pair x =
   match tls_version_of_pair x with
   | Some v -> Some v
   | None ->
-     match x with
-     | (3, 0) -> Some `SSL_3
-     | (3, x) -> Some (`TLS_1_X x)
-     | _      -> None
+    match Dtls.Version.of_pair x with
+    Some v -> Some v 
+    | None  ->
+      match x with
+      | (3, 0) -> Some `SSL_3
+      | (3, x) -> Some (`TLS_1_X x)
+      | _      -> None
 
 let pair_of_tls_any_version = function
   | #tls_version as x -> pair_of_tls_version x
+  | `SSL_3 -> (3, 0)
+  | `TLS_1_X m -> (3, m)
+
+let pair_of_any_version = function
+  | #tls_version as x -> pair_of_tls_version x
+  | #Dtls.Version.t as x -> Dtls.Version.to_pair x 
   | `SSL_3 -> (3, 0)
   | `TLS_1_X m -> (3, m)
 
@@ -91,8 +143,29 @@ let min_protocol_version (lo, _) = lo
 
 type tls_hdr = {
   content_type : content_type;
-  version      : tls_any_version;
+  version      : any_version;
 } [@@deriving sexp]
+
+type dtls_hdr = {
+  content_type : Packet.content_type;
+  version : any_version;
+  epoch : int;                           (* Incremented on every cipher suite change *)
+  sequence_number : int;             (* DTLS handles out of order packets *)
+} [@@deriving sexp]
+
+type hdr = [`TLS of tls_hdr | `DTLS of dtls_hdr ] [@@deriving sexp]
+
+let set_version version : hdr -> hdr = function 
+  | `TLS t -> `TLS { t with version }
+  | `DTLS t -> `DTLS { t with version }
+
+let get_version = function 
+  | `TLS (t : tls_hdr) -> t.version
+  | `DTLS (t : dtls_hdr) -> t.version
+
+let get_content_type = function 
+  | `TLS (t : tls_hdr) -> t.content_type
+  | `DTLS (t : dtls_hdr) -> t.content_type
 
 module SessionID = struct
   type t = Cstruct_sexp.t [@@deriving sexp]
@@ -209,7 +282,7 @@ type client_extension = [
   | `KeyShare of (Packet.named_group * Cstruct_sexp.t) list
   | `EarlyDataIndication
   | `PreSharedKeys of psk_identity list
-  | `SupportedVersions of tls_any_version list
+  | `SupportedVersions of any_version list
   | `PostHandshakeAuthentication
   | `Cookie of Cstruct_sexp.t
   | `PskKeyExchangeModes of psk_key_exchange_mode list
@@ -251,7 +324,7 @@ type hello_retry_extension = [
 ] [@@deriving sexp]
 
 type client_hello = {
-  client_version : tls_any_version;
+  client_version : any_version;
   client_random  : Cstruct_sexp.t;
   sessionid      : SessionID.t option;
   ciphersuites   : any_ciphersuite list;
@@ -259,7 +332,7 @@ type client_hello = {
 } [@@deriving sexp]
 
 type server_hello = {
-  server_version : tls_version;
+  server_version : tls_version_with_dtls;
   server_random  : Cstruct_sexp.t;
   sessionid      : SessionID.t option;
   ciphersuite    : ciphersuite;
@@ -359,7 +432,7 @@ type epoch_state = [ `ZeroRTT | `Established ] [@@deriving sexp]
 (** information about an open session *)
 type epoch_data = {
   state                  : epoch_state ;
-  protocol_version       : tls_version ;
+  protocol_version       : tls_version_with_dtls ;
   ciphersuite            : Ciphersuite.ciphersuite ;
   peer_random            : Cstruct_sexp.t ;
   peer_certificate_chain : Cert.t list ;

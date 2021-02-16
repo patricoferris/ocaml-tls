@@ -41,7 +41,7 @@ let sexp_of_ticket_cache_opt _ = Sexplib.Sexp.Atom "TICKET_CACHE"
 
 type config = {
   ciphers : Ciphersuite.ciphersuite list ;
-  protocol_versions : tls_version * tls_version ;
+  protocol_versions : tls_version_with_dtls * tls_version_with_dtls ;
   signature_algorithms : signature_algorithm list ;
   use_reneg : bool ;
   authenticator : Auth.t option ;

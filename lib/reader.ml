@@ -77,9 +77,10 @@ let parse_record buf =
       with
       | None, _ -> fail (UnknownVersion version)
       | _, None -> fail (UnknownContent typ)
+      | Some version, Some _ when Dtls.Version.is_dtls version -> fail (UnknownContent typ)
       | Some version, Some content_type ->
         let payload, rest = split ~start:5 buf x in
-        return (`Record (({ content_type ; version }, payload), rest))
+        return (`Record ((`TLS { content_type ; version }, payload), rest))
 
 let validate_alert (lvl, typ) =
   let open Packet in

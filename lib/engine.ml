@@ -107,7 +107,7 @@ let new_state config role =
   let version = max_protocol_version Config.(config.protocol_versions) in
   let handshake = {
     session          = [] ;
-    protocol_version = version ;
+    protocol_version = version_to_tls version ;
     early_data_left  = 0l ;
     machina          = handshake_state ;
     config           = config ;
@@ -121,10 +121,10 @@ let new_state config role =
     fragment  = Cstruct.create 0 ;
   }
 
-type raw_record = tls_hdr * Cstruct_sexp.t [@@deriving sexp]
+type raw_record = hdr * Cstruct_sexp.t [@@deriving sexp]
 
 (* well-behaved pure encryptor *)
-let encrypt (version : tls_version) (st : crypto_state) ty buf =
+let encrypt (version : tls_version_with_dtls) (st : crypto_state) ty buf =
   match st with
   | None -> (st, ty, buf)
   | Some ctx ->
@@ -145,7 +145,7 @@ let encrypt (version : tls_version) (st : crypto_state) ty buf =
      | _ ->
         let pseudo_hdr =
           let seq = ctx.sequence
-          and ver = pair_of_tls_version version
+          and ver = pair_of_tls_version_with_dtls version
         in
         Crypto.pseudo_header seq ty ver (Cstruct.len buf)
         in
@@ -316,7 +316,7 @@ let decrypt ?(trial = false) (version : tls_version) (st : crypto_state) ty buf 
     return (Some ctx', msg, ty)
 
 (* party time *)
-let rec separate_records : Cstruct.t ->  ((tls_hdr * Cstruct.t) list * Cstruct.t) eff
+let rec separate_records : Cstruct.t ->  ((hdr * Cstruct.t) list * Cstruct.t) eff
 = fun buf ->
   let open Reader in
   match parse_record buf with
@@ -482,7 +482,6 @@ let decrement_early_data hs ty buf =
 
 (* the main thingy *)
 let handle_raw_record state (hdr, buf as record : raw_record) =
-
   Tracing.sexpf ~tag:"record-in" ~f:sexp_of_raw_record record ;
   let hs = state.handshake in
   let version = hs.protocol_version in
@@ -490,15 +489,16 @@ let handle_raw_record state (hdr, buf as record : raw_record) =
     | Client (AwaitServerHello _), _       -> return ()
     | Server AwaitClientHello    , _       -> return ()
     | Server13 AwaitClientHelloHRR13, _       -> return ()
-    | _                          , `TLS_1_3 -> guard (hdr.version = `TLS_1_2) (`Fatal (`BadRecordVersion hdr.version))
-    | _                          , v       -> guard (version_eq hdr.version v) (`Fatal (`BadRecordVersion hdr.version)) )
+    | _, `TLS_1_3 -> guard (get_version hdr = `TLS_1_2) (`Fatal (`BadRecordVersion (get_version hdr)))
+    | _, v       -> guard (version_eq (get_version hdr) (tls_version_with_dtls_to_tls v)) (`Fatal (`BadRecordVersion (get_version hdr))) )
   >>= fun () ->
   let trial = match hs.machina with
     | Server13 (AwaitEndOfEarlyData13 _) | Server13 Established13 -> false
     | Server13 _ -> hs.early_data_left > 0l && Cstruct.len hs.hs_fragment = 0
     | _ -> false
   in
-  decrypt ~trial version state.decryptor hdr.content_type buf
+  (* TLS OK here? *)
+  decrypt ~trial (tls_version_with_dtls_to_tls version) state.decryptor (get_content_type hdr) buf
   >>= fun (dec_st, dec, ty) ->
   decrement_early_data hs ty buf >>= fun handshake ->
   Tracing.sexpf ~tag:"frame-in" ~f:sexp_of_record (ty, dec) ;
@@ -510,7 +510,7 @@ let handle_raw_record state (hdr, buf as record : raw_record) =
       | `Change_dec dec' -> (enc, Some dec', es)
       | `Record r       ->
          Tracing.sexpf ~tag:"frame-out" ~f:sexp_of_record r ;
-          let (enc', encbuf) = encrypt_records enc handshake.protocol_version [r] in
+          let (enc', encbuf) = encrypt_records enc (tls_version_with_dtls_to_tls handshake.protocol_version) [r] in
           (enc', dec, es @ encbuf))
     (state.encryptor, dec_st, [])
     items
@@ -525,8 +525,8 @@ let maybe_app a b = match a, b with
   | None  , Some y -> Some y
   | None  , None   -> None
 
-let assemble_records (version : tls_version) rs =
-  let version = match version with `TLS_1_3 -> `TLS_1_2 | x -> x in
+let assemble_records version rs =
+  let version = match version with `TLS_1_3 -> `TLS_1_2 | #Dtls.Version.t as x -> Dtls.Version.tls_version x | x -> x in
   Cs.appends (List.map (Writer.assemble_hdr version) rs)
 
 (* main entry point *)

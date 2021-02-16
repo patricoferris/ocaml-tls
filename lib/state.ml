@@ -89,7 +89,7 @@ type common_session_data = {
 
 type session_data = {
   common_session_data    : common_session_data ;
-  client_version         : tls_any_version ; (* version in client hello (needed in RSA client key exchange) *)
+  client_version         : any_version ; (* version in client hello (needed in RSA client key exchange) *)
   ciphersuite            : Ciphersuite.ciphersuite ;
   group                  : group option ;
   renegotiation          : reneg_params ; (* renegotiation data *)
@@ -178,7 +178,7 @@ type handshake_machina_state =
 (* state during a handshake, used in the handlers *)
 type handshake_state = {
   session          : [ `TLS of session_data | `TLS13 of session_data13 ] list ;
-  protocol_version : tls_version ;
+  protocol_version : tls_version_with_dtls ;
   early_data_left  : int32 ;
   machina          : handshake_machina_state ; (* state machine state *)
   config           : Config.config ; (* given config *)
@@ -220,7 +220,7 @@ end
 type error = [
   | `AuthenticationFailure of V_err.t
   | `NoConfiguredCiphersuite of Ciphersuite.ciphersuite list
-  | `NoConfiguredVersions of tls_version list
+  | `NoConfiguredVersions of tls_version_with_dtls list
   | `NoConfiguredSignatureAlgorithm of signature_algorithm list
   | `NoMatchingCertificateFound of string
   | `NoCertificateConfigured
@@ -247,7 +247,7 @@ type client_hello_errors = [
 type fatal = [
   | `NoSecureRenegotiation
   | `NoSupportedGroup
-  | `NoVersions of tls_any_version list
+  | `NoVersions of any_version list
   | `ReaderError of Reader.error
   | `NoCertificateReceived
   | `NoCertificateVerifyReceived
@@ -266,7 +266,7 @@ type fatal = [
   | `UnknownContentType of int
   | `CannotHandleApplicationDataYet
   | `NoHeartbeat
-  | `BadRecordVersion of tls_any_version
+  | `BadRecordVersion of any_version
   | `BadFinished
   | `HandshakeFragmentsNotEmpty
   | `InsufficientDH
@@ -274,7 +274,7 @@ type fatal = [
   | `InvalidRenegotiation
   | `InvalidClientHello of client_hello_errors
   | `InvalidServerHello
-  | `InvalidRenegotiationVersion of tls_version
+  | `InvalidRenegotiationVersion of tls_version_with_dtls
   | `InappropriateFallback
   | `UnexpectedCCS
   | `UnexpectedHandshake of tls_handshake
@@ -356,4 +356,4 @@ let epoch_of_hs hs =
   in
   match hs.session with
   | []           -> None
-  | session :: _ -> Some (epoch_of_session server peer_name hs.protocol_version session)
+  | session :: _ -> Some (epoch_of_session server peer_name (tls_version_with_dtls_to_tls hs.protocol_version) session)

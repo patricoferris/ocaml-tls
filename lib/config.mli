@@ -29,7 +29,7 @@ type ticket_cache_opt = ticket_cache option
 (** configuration parameters *)
 type config = private {
   ciphers : Ciphersuite.ciphersuite list ; (** ordered list (regarding preference) of supported cipher suites *)
-  protocol_versions : tls_version * tls_version ; (** supported protocol versions (min, max) *)
+  protocol_versions : tls_version_with_dtls * tls_version_with_dtls ; (** supported protocol versions (min, max) *)
   signature_algorithms : signature_algorithm list ; (** ordered list of supported signature algorithms (regarding preference) *)
   use_reneg : bool ; (** endpoint should accept renegotiation requests *)
   authenticator : X509.Authenticator.t option ; (** optional X509 authenticator *)
@@ -72,7 +72,7 @@ val client :
   authenticator : X509.Authenticator.t ->
   ?peer_name : string ->
   ?ciphers : Ciphersuite.ciphersuite list ->
-  ?version : tls_version * tls_version ->
+  ?version : tls_version_with_dtls * tls_version_with_dtls ->
   ?signature_algorithms : signature_algorithm list ->
   ?reneg : bool ->
   ?certificates : own_cert ->
@@ -88,7 +88,7 @@ val client :
     @raise Invalid_argument if the configuration is invalid *)
 val server :
   ?ciphers : Ciphersuite.ciphersuite list ->
-  ?version : tls_version * tls_version ->
+  ?version : tls_version_with_dtls * tls_version_with_dtls ->
   ?signature_algorithms : signature_algorithm list ->
   ?reneg : bool ->
   ?certificates : own_cert ->

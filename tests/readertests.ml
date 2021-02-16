@@ -99,18 +99,18 @@ let good_records =
   let open Packet in
   let empty = Cstruct.create 0 in
   [
-    ([ 20 ; 3 ; 1 ; 0 ; 0 ], `Record (({ content_type = CHANGE_CIPHER_SPEC ; version = `TLS_1_0 }, empty), empty) ) ;
-    ([ 21 ; 3 ; 2 ; 0 ; 0 ], `Record (({ content_type = ALERT ; version = `TLS_1_1 }, empty), empty) ) ;
-    ([ 22 ; 3 ; 3 ; 0 ; 0 ], `Record (({ content_type = HANDSHAKE ; version = `TLS_1_2 }, empty), empty) ) ;
-    ([ 23 ; 3 ; 0 ; 0 ; 0 ], `Record (({ content_type = APPLICATION_DATA ; version = `SSL_3 }, empty), empty) ) ;
-    ([ 24 ; 3 ; 4 ; 0 ; 0 ], `Record (({ content_type = HEARTBEAT ; version = `TLS_1_3 }, empty), empty) ) ;
+    ([ 20 ; 3 ; 1 ; 0 ; 0 ], `Record ((`TLS { content_type = CHANGE_CIPHER_SPEC ; version = `TLS_1_0 }, empty), empty) ) ;
+    ([ 21 ; 3 ; 2 ; 0 ; 0 ], `Record ((`TLS { content_type = ALERT ; version = `TLS_1_1 }, empty), empty) ) ;
+    ([ 22 ; 3 ; 3 ; 0 ; 0 ], `Record ((`TLS { content_type = HANDSHAKE ; version = `TLS_1_2 }, empty), empty) ) ;
+    ([ 23 ; 3 ; 0 ; 0 ; 0 ], `Record ((`TLS { content_type = APPLICATION_DATA ; version = `SSL_3 }, empty), empty) ) ;
+    ([ 24 ; 3 ; 4 ; 0 ; 0 ], `Record ((`TLS { content_type = HEARTBEAT ; version = `TLS_1_3 }, empty), empty) ) ;
     ([ 16 ; 3 ; 1 ; 0 ; 0 ], `UnknownContent 16 ) ;
     ([ 19 ; 3 ; 1 ; 0 ; 0 ], `UnknownContent 19 ) ;
     ([ 20 ; 5 ; 1 ; 0 ; 0 ], `UnknownVersion (5, 1) ) ;
     ([ 20 ; 3 ; 1 ; 0 ; 100 ], `Fragment (list_to_cstruct [ 20 ; 3 ; 1 ; 0 ; 100 ] )) ;
     ([ 0 ], `Fragment (list_to_cstruct [ 0 ])) ;
     ([ ], `Fragment empty) ;
-    ([ 20 ; 3 ; 1 ; 0 ; 0 ; 0 ], `Record (({ content_type = CHANGE_CIPHER_SPEC ; version = `TLS_1_0 }, empty), list_to_cstruct [ 0 ]) ) ;
+    ([ 20 ; 3 ; 1 ; 0 ; 0 ; 0 ], `Record ((`TLS { content_type = CHANGE_CIPHER_SPEC ; version = `TLS_1_0 }, empty), list_to_cstruct [ 0 ]) ) ;
     ([ 0 ; 0 ; 0 ; 255 ; 255 ], `Overflow 65535) ;
     ([ 0 ; 0 ; 0 ; 72 ; 1 ], `Overflow 18433)
 ]

@@ -25,15 +25,15 @@ let readerwriter_header (v, ct, cs) _ =
   | Ok (`Record ((hdr, payload), f)) ->
     let open Core in
     assert_equal 0 (Cstruct.len f) ;
-    assert_equal (v :> tls_any_version) hdr.version ;
-    assert_equal ct hdr.content_type ;
+    assert_equal (v :> any_version) (get_version hdr) ;
+    assert_equal ct (get_content_type hdr) ;
     assert_cs_eq cs payload ;
-    let buf' = Writer.assemble_hdr v (hdr.content_type, payload) in
+    let buf' = Writer.assemble_hdr v (get_content_type hdr, payload) in
     (match Reader.parse_record buf' with
      | Ok (`Record ((hdr, payload), f)) ->
        assert_equal 0 (Cstruct.len f) ;
-       assert_equal (v :> tls_any_version) hdr.version ;
-       assert_equal ct hdr.content_type ;
+       assert_equal (v :> any_version) (get_version hdr) ;
+       assert_equal ct (get_content_type hdr) ;
        assert_cs_eq cs payload ;
      | _ -> assert_failure "inner header broken")
   | _ -> assert_failure "header broken"

@@ -14,9 +14,9 @@ val sexp_of_error : error -> Sexplib.Sexp.t
 type nonrec 'a result = ('a, error) result
 
 val parse_version     : Cstruct.t -> Core.tls_version result
-val parse_any_version : Cstruct.t -> Core.tls_any_version result
+val parse_any_version : Cstruct.t -> Core.any_version result
 val parse_record      : Cstruct.t ->
-  [ `Record of (Core.tls_hdr * Cstruct.t) * Cstruct.t
+  [ `Record of (Core.hdr * Cstruct.t) * Cstruct.t
   | `Fragment of Cstruct.t
   ] result
 

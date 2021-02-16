@@ -100,14 +100,16 @@ let answer_client_certificate_DHE_RSA state (session : session_data) dh_sent cer
 
 let answer_client_certificate_verify state (session : session_data) sctx cctx verify raw log =
   let sigdata = Cs.appends log in
-  verify_digitally_signed state.protocol_version state.config.signature_algorithms verify sigdata session.common_session_data.peer_certificate >|= fun () ->
+  let tls_version = version_to_tls state.protocol_version in 
+  verify_digitally_signed tls_version state.config.signature_algorithms verify sigdata session.common_session_data.peer_certificate >|= fun () ->
   let machina = AwaitClientChangeCipherSpec (session, sctx, cctx, log @ [raw]) in
   ({ state with machina = Server machina }, [])
 
 let answer_client_key_exchange_RSA state (session : session_data) kex raw log =
   (* due to bleichenbacher attach, we should use a random pms *)
   (* then we do not leak any decryption or padding errors! *)
-  let other = Writer.assemble_protocol_version state.protocol_version <+> Mirage_crypto_rng.generate 46 in
+  let tls_version = version_to_tls state.protocol_version in 
+  let other = Writer.assemble_protocol_version tls_version <+> Mirage_crypto_rng.generate 46 in
   let validate_premastersecret k =
     (* Client implementations MUST always send the correct version number in
        PreMasterSecret.  If ClientHello.client_version is TLS 1.1 or higher,
@@ -215,7 +217,7 @@ let server_hello config (client_hello : client_hello) (session : session_data) v
         extensions     = secren :: host @ ems @ alpn @ ecpointformat }
   in
   trace_cipher session.ciphersuite ;
-  Tracing.sexpf ~tag:"version" ~f:sexp_of_tls_version version ;
+  Tracing.sexpf ~tag:"version" ~f:sexp_of_tls_version_with_dtls version ;
   Tracing.sexpf ~tag:"handshake-out" ~f:sexp_of_tls_handshake sh ;
   let common_session_data = { session.common_session_data with server_random } in
   (Writer.assemble_handshake sh,
@@ -305,7 +307,7 @@ let answer_client_hello_common state reneg ch raw =
              protocol version did not change from the previous epoch (in
              answer_client_hello_reneg, process_client_hello the
              guard (version = oldversion)) *)
-          fail (`Fatal (`BadRecordVersion (version :> tls_any_version)))) >|= fun data ->
+          fail (`Fatal (`BadRecordVersion (version :> any_version)))) >|= fun data ->
        let certreq = CertificateRequest data in
        Tracing.sexpf ~tag:"handshake-out" ~f:sexp_of_tls_handshake certreq ;
        let common_session_data = { session.common_session_data with client_auth = true } in
@@ -339,15 +341,16 @@ let answer_client_hello_common state reneg ch raw =
     (hs, secret) in
 
   process_client_hello ch state.config >>= fun session ->
-  let sh, session = server_hello state.config ch session state.protocol_version reneg in
+  let tls_version = version_to_tls state.protocol_version in 
+  let sh, session = server_hello state.config ch session tls_version reneg in
   let certificates = server_cert session
   and hello_done = Writer.assemble_handshake ServerHelloDone
   in
-  cert_request state.protocol_version state.config session >>= fun (cert_req, session) ->
+  cert_request tls_version state.config session >>= fun (cert_req, session) ->
 
   ( match Ciphersuite.ciphersuite_kex session.ciphersuite with
     | `DHE_RSA ->
-        kex_dhe_rsa state.config session state.protocol_version (sig_algs ch) >>= fun (kex, dh) ->
+        kex_dhe_rsa state.config session tls_version (sig_algs ch) >>= fun (kex, dh) ->
         let outs = sh :: certificates @ [ kex ] @ cert_req @ [ hello_done ] in
         let log = raw :: outs in
         let machina =
@@ -386,11 +389,11 @@ let agreed_version supported (client_hello : client_hello) =
     | _ -> invalid_arg "bad supported version extension"
   in
   let supported_versions = List.fold_left (fun acc v ->
-      match any_version_to_version v with
+      match any_version_to_tls_version v with
       | None -> acc
       | Some v -> v :: acc) [] raw_client_versions
   in
-  let client_versions = List.sort_uniq compare_tls_version supported_versions in
+  let client_versions = List.sort_uniq compare_tls_with_dtls_version supported_versions in
   match
     List.fold_left (fun r v ->
         match supported_protocol_version supported v with
@@ -421,7 +424,7 @@ let answer_client_hello state (ch : client_hello) raw =
     in
 
     match option None state.config.session_cache ch.sessionid with
-    | Some epoch when epoch_matches epoch state.protocol_version ch.ciphersuites ch.extensions ->
+    | Some epoch when epoch_matches epoch (version_to_tls state.protocol_version) ch.ciphersuites ch.extensions ->
       let session =
         let session = session_of_epoch epoch in
         let common_session_data = {
@@ -474,7 +477,7 @@ let answer_client_hello state (ch : client_hello) raw =
 
   let process protocol_version =
     process_client_hello state.config ch protocol_version >>= fun () ->
-    let state = { state with protocol_version } in
+    let state = { state with protocol_version = version_to_tls protocol_version } in
     (match resume ch state with
      | None -> answer_client_hello_common state None ch raw
      | Some session -> answer_resumption session state)
@@ -507,7 +510,7 @@ let answer_client_hello_reneg state (ch : client_hello) raw =
   match config.use_reneg, state.session with
   | true , `TLS session :: _  ->
      let reneg = session.renegotiation in
-     process_client_hello config state.protocol_version reneg ch >>= fun _version ->
+     process_client_hello config (version_to_tls state.protocol_version) reneg ch >>= fun _version ->
      answer_client_hello_common state (Some reneg) ch raw
   | false, _             ->
     let no_reneg = Writer.assemble_alert ~level:Packet.WARNING Packet.NO_RENEGOTIATION in

@@ -120,7 +120,7 @@ let answer_certificate state (session : session_data13) server_hs_secret client_
 
 let answer_certificate_verify (state : handshake_state) (session : session_data13) server_hs_secret client_hs_secret cv raw log =
   let tbs = Mirage_crypto.Hash.digest (Ciphersuite.hash13 session.ciphersuite13) log in
-  verify_digitally_signed state.protocol_version
+  verify_digitally_signed (version_to_tls state.protocol_version)
     ~context_string:"TLS 1.3, server CertificateVerify"
     state.config.signature_algorithms cv tbs
     session.common_session_data13.peer_certificate >>= fun () ->

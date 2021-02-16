@@ -159,9 +159,9 @@ let session13_of_epoch cipher (epoch : epoch_data) : session_data13 =
   }
 
 let supported_protocol_version (min, max) v =
-  if compare_tls_version min v > 0 then
+  if compare_tls_with_dtls_version min v > 0 then
     None
-  else if compare_tls_version v max > 0 then
+  else if compare_tls_with_dtls_version v max > 0 then
     None
   else
     Some v
@@ -259,7 +259,7 @@ let client_hello_valid version (ch : client_hello) =
   in
 
   let version_good = match version with
-    | `TLS_1_2 | `TLS_1_X _ -> `Ok
+    | `TLS_1_2 | `DTLS_1_2 | `TLS_1_X _ -> `Ok
     | `TLS_1_3 ->
       ( let good_sig_alg =
           List.exists (fun sa -> List.mem sa Config.supported_signature_algorithms)
@@ -282,7 +282,7 @@ let client_hello_valid version (ch : client_hello) =
               | _, _, false -> `Error (`NotSubsetKeyShareSupportedGroup (gs, ks)) )
         | Some x -> `Error (`NoGoodSignatureAlgorithms x)
       )
-    | `SSL_3 | `TLS_1_0 | `TLS_1_1 ->
+    | `SSL_3 | `TLS_1_0 | `TLS_1_1 | `DTLS_1_0 ->
       Utils.option `Ok (fun _ -> `Error `HasSignatureAlgorithmsExtension) sig_alg
   in
 

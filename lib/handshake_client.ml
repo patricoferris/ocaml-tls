@@ -22,8 +22,8 @@ let default_client_hello config =
     | xs -> [ `ECPointFormats ; `SupportedGroups (List.map group_to_named_group xs) ]
   in
   let extensions, secrets = match version with
-    | `TLS_1_0 | `TLS_1_1 -> (ecc_groups, [])
-    | `TLS_1_2 ->
+    | `TLS_1_0 | `TLS_1_1 | `DTLS_1_0 -> (ecc_groups, []) (* XXX: Patricoferris hmmm? *)
+    | `TLS_1_2 | `DTLS_1_2 ->
       (`SignatureAlgorithms config.signature_algorithms :: ecc_groups, [])
     | `TLS_1_3 ->
       let sig_alg = config.signature_algorithms (* TODO: filter deprecated ones *)
@@ -42,8 +42,8 @@ let default_client_hello config =
         in
         List.split (gen 2 config.groups [])
       in
-      let all = all_versions config.protocol_versions in
-      let supported_versions = List.map (fun x -> (x :> tls_any_version)) all in
+      let all = all_versions_dtls config.protocol_versions in
+      let supported_versions = List.map (fun x -> (x :> any_version)) all in
       let point_format =
         if min_protocol_version config.protocol_versions = `TLS_1_3 then
           []
@@ -75,7 +75,7 @@ let default_client_hello config =
     | _ -> None
   in
   let ch = {
-    client_version = (version :> tls_any_version) ;
+    client_version = (version :> any_version) ;
     client_random  = Mirage_crypto_rng.generate 32 ;
     sessionid      = sessionid ;
     ciphersuites   = List.map Ciphersuite.ciphersuite_to_any_ciphersuite ciphers ;
@@ -127,7 +127,7 @@ let common_server_hello_machina state (sh : server_hello) (ch : client_hello) ra
       client_version   = ch.client_version ;
     }
   in
-  let state = { state with protocol_version = sh.server_version } in
+  let state = { state with protocol_version = (version_to_tls sh.server_version) } in
   match Ciphersuite.ciphersuite_kex cipher with
   | `RSA     ->
     let machina = Client (AwaitCertificate_RSA (session, log @ [raw])) in
@@ -164,11 +164,11 @@ let answer_server_hello state (ch : client_hello) sh secrets raw log =
              (List.mem `ExtendedMasterSecret sh.extensions && epoch.extended_ms))
   in
 
-  Tracing.sexpf ~tag:"version" ~f:sexp_of_tls_version sh.server_version ;
+  Tracing.sexpf ~tag:"version" ~f:sexp_of_tls_version_with_dtls sh.server_version ;
   trace_cipher sh.ciphersuite ;
 
-  let state = { state with protocol_version = sh.server_version } in
-  match sh.server_version with
+  let state = { state with protocol_version = (version_to_tls sh.server_version) } in
+  match Core.tls_version_with_dtls_to_tls sh.server_version with
   | #tls13 ->
     Handshake_client13.answer_server_hello state ch sh secrets raw (Cs.appends log)
   | #tls_before_13 as v ->
@@ -196,7 +196,7 @@ let answer_server_hello state (ch : client_hello) sh secrets raw log =
 
 let answer_server_hello_renegotiate state session (ch : client_hello) sh raw log =
   common_server_hello_validation state.config (Some session.renegotiation) sh ch >>= fun () ->
-  guard (state.protocol_version = sh.server_version)
+  guard (state.protocol_version = (version_to_tls sh.server_version))
     (`Fatal (`InvalidRenegotiationVersion sh.server_version)) >>= fun () ->
   common_server_hello_machina state sh ch raw log
 
@@ -272,7 +272,7 @@ let answer_server_key_exchange_DHE_RSA state (session : session_data) kex raw lo
   ) >>= fun (group, shared, raw_dh_params, leftover) ->
 
   let sigdata = session.common_session_data.client_random <+> session.common_session_data.server_random <+> raw_dh_params in
-  verify_digitally_signed state.protocol_version state.config.signature_algorithms leftover sigdata session.common_session_data.peer_certificate >>= fun () ->
+  verify_digitally_signed (version_to_tls state.protocol_version) state.config.signature_algorithms leftover sigdata session.common_session_data.peer_certificate >>= fun () ->
 
   (match group with
    | `Mirage_crypto g ->
@@ -311,7 +311,7 @@ let answer_certificate_request state (session : session_data) cr kex pms raw log
        ( match Reader.parse_certificate_request_1_2 cr with
          | Ok (types, sigalgs, cas) -> return (types, Some sigalgs, cas)
          | Error re -> fail (`Fatal (`ReaderError re)) )
-    | v -> fail (`Fatal (`BadRecordVersion (v :> tls_any_version))) (* never happens *)
+    | v -> fail (`Fatal (`BadRecordVersion (v :> any_version))) (* never happens *)
   ) >|= fun (types, sigalgs, _cas) ->
   (* TODO: respect cas, maybe multiple client certificates? *)
   let own_certificate, own_private_key =
@@ -347,7 +347,7 @@ let answer_server_hello_done state (session : session_data) sigalgs kex premaste
        let data = Cs.appends to_sign in
        let ver = state.protocol_version
        and my_sigalgs = state.config.signature_algorithms in
-       signature ver data sigalgs my_sigalgs p >|= fun (signature) ->
+       signature (version_to_tls ver) data sigalgs my_sigalgs p >|= fun (signature) ->
        let cert_verify = CertificateVerify signature in
        let ccert_verify = Writer.assemble_handshake cert_verify in
        ([ cert ; kex ; cert_verify ],

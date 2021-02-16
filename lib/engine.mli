@@ -55,7 +55,7 @@ val server : Config.server -> state
 type error = [
   | `AuthenticationFailure of X509.Validation.validation_error
   | `NoConfiguredCiphersuite of Ciphersuite.ciphersuite list
-  | `NoConfiguredVersions of Core.tls_version list
+  | `NoConfiguredVersions of Core.tls_version_with_dtls list
   | `NoConfiguredSignatureAlgorithm of Core.signature_algorithm list
   | `NoMatchingCertificateFound of string
   | `NoCertificateConfigured
@@ -83,7 +83,7 @@ type client_hello_errors = [
 type fatal = [
   | `NoSecureRenegotiation
   | `NoSupportedGroup
-  | `NoVersions of Core.tls_any_version list
+  | `NoVersions of Core.any_version list
   | `ReaderError of Reader.error
   | `NoCertificateReceived
   | `NoCertificateVerifyReceived
@@ -102,7 +102,7 @@ type fatal = [
   | `UnknownContentType of int
   | `CannotHandleApplicationDataYet
   | `NoHeartbeat
-  | `BadRecordVersion of Core.tls_any_version
+  | `BadRecordVersion of Core.any_version
   | `BadFinished
   | `HandshakeFragmentsNotEmpty
   | `InsufficientDH
@@ -110,7 +110,7 @@ type fatal = [
   | `InvalidRenegotiation
   | `InvalidClientHello of client_hello_errors
   | `InvalidServerHello
-  | `InvalidRenegotiationVersion of Core.tls_version
+  | `InvalidRenegotiationVersion of Core.tls_version_with_dtls
   | `InappropriateFallback
   | `UnexpectedCCS
   | `UnexpectedHandshake of Core.tls_handshake

@@ -4,8 +4,12 @@ open Cstruct
 
 let (<+>) = Utils.Cs.(<+>)
 
+let pair_of_version = function 
+  | #Dtls.Version.t as x -> Dtls.Version.to_pair x 
+  | #tls_version as t -> pair_of_tls_version t 
+
 let assemble_protocol_version_int buf version =
-  let major, minor = pair_of_tls_version version in
+  let major, minor = pair_of_version version in
   set_uint8 buf 0 major;
   set_uint8 buf 1 minor
 
@@ -16,7 +20,7 @@ let assemble_protocol_version version =
 
 let assemble_any_protocol_version version =
   let buf = create 2 in
-  let major, minor = pair_of_tls_any_version version in
+  let major, minor = pair_of_any_version version in
   set_uint8 buf 0 major ;
   set_uint8 buf 1 minor ;
   buf
