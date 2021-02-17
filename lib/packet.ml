@@ -73,7 +73,7 @@ type handshake_type =
   | HELLO_REQUEST        [@id 0]
   | CLIENT_HELLO         [@id 1]
   | SERVER_HELLO         [@id 2]
-  | HELLO_VERIFY_REQUEST [@id 3] (*RFC6347*)
+  | HELLO_VERIFY_REQUEST [@id 3] (* RFC6347 -- DTLS 1.2 *)
   | SESSION_TICKET       [@id 4] (*RFC4507, RFC8446*)
   | END_OF_EARLY_DATA    [@id 5] (*RFC8446*)
   | ENCRYPTED_EXTENSIONS [@id 8] (*RFC8446*)

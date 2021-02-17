@@ -47,7 +47,7 @@ let answer_server_hello state ch (sh : server_hello) secrets raw log =
             let common_session_data13 =
               { base.common_session_data13 with
                 server_random = sh.server_random ;
-                client_random = ch.client_random ;
+                client_random = get_ch_random ch;
                 master_secret = master_secret.secret }
             in
             { base with master_secret ; common_session_data13 ; resumed }
@@ -77,15 +77,17 @@ let answer_hello_retry_request state (ch : client_hello) hrr _secrets raw log =
     | Some c -> [ `Cookie c ]
   in
   (* use the same extensions as in original CH, apart from PSK!? and early_data *)
-  let other_exts = List.filter (function `KeyShare _ -> false | _ -> true) ch.extensions in
-  let new_ch = { ch with extensions = `KeyShare [keyshare] :: other_exts @ cookie} in
-  let new_ch_raw = Writer.assemble_handshake (ClientHello new_ch) in
-  let ch0_data = Mirage_crypto.Hash.digest (Ciphersuite.hash13 hrr.ciphersuite) log in
-  let ch0_hdr = Writer.assemble_message_hash (Cstruct.len ch0_data) in
-  let st = AwaitServerHello13 (new_ch, [secret], Cs.appends [ ch0_hdr ; ch0_data ; raw ; new_ch_raw ]) in
-
-  Tracing.sexpf ~tag:"handshake-out" ~f:sexp_of_tls_handshake (ClientHello new_ch);
-  return ({ state with machina = Client13 st ; protocol_version = `TLS_1_3 }, [`Record (Packet.HANDSHAKE, new_ch_raw)])
+  let other_exts = List.filter (function `KeyShare _ -> false | _ -> true) (get_ch_extensions ch) in
+  match ch with 
+    | `TLS ch -> 
+      let new_ch = { ch with extensions = `KeyShare [keyshare] :: other_exts @ cookie} in
+      let new_ch_raw = Writer.assemble_handshake (ClientHello (`TLS new_ch)) in
+      let ch0_data = Mirage_crypto.Hash.digest (Ciphersuite.hash13 hrr.ciphersuite) log in
+      let ch0_hdr = Writer.assemble_message_hash (Cstruct.len ch0_data) in
+      let st = AwaitServerHello13 (`TLS new_ch, [secret], Cs.appends [ ch0_hdr ; ch0_data ; raw ; new_ch_raw ]) in
+      Tracing.sexpf ~tag:"handshake-out" ~f:sexp_of_tls_handshake (ClientHello (`TLS new_ch));
+      return ({ state with machina = Client13 st ; protocol_version = `TLS_1_3 }, [`Record (Packet.HANDSHAKE, new_ch_raw)])
+  | _ -> assert false (* DTLS -- not supported with TLS.1.3 yet *)
 
 let answer_encrypted_extensions state (session : session_data13) server_hs_secret client_hs_secret ee raw log =
   (* TODO we now know: - hostname - early_data (preserve this in session!!) *)

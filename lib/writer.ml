@@ -316,17 +316,17 @@ let assemble_sid sid =
   | Some s -> set_uint8 buf 0 (len s); buf <+> s
 
 let assemble_client_hello (cl : client_hello) : Cstruct.t =
-  let version = match cl.client_version with
+  let version = match (get_ch_version cl) with
     | `TLS_1_3 -> `TLS_1_2 (* keep 0x03 0x03 on wire *)
     | x -> x
   in
   let v = assemble_any_protocol_version version in
-  let sid = assemble_sid cl.sessionid in
-  let css = assemble_any_ciphersuites cl.ciphersuites in
+  let sid = assemble_sid (get_ch_session_id cl) in
+  let css = assemble_any_ciphersuites (get_ch_ciphersuites cl) in
   (* compression methods, completely useless *)
   let cms = assemble_compression_methods [NULL] in
-  let bbuf = v <+> cl.client_random <+> sid <+> css <+> cms in
-  let extensions = assemble_extensions ~none_if_empty:true assemble_client_extension cl.extensions in
+  let bbuf = v <+> (get_ch_random cl) <+> sid <+> css <+> cms in
+  let extensions = assemble_extensions ~none_if_empty:true assemble_client_extension (get_ch_extensions cl) in
   (* some widely deployed firewalls drop ClientHello messages which are
      > 256 and < 511 byte, insert PADDING extension for these *)
   (* from draft-ietf-tls-padding-00:
@@ -345,7 +345,7 @@ let assemble_client_hello (cl : client_hello) : Cstruct.t =
     (* since PreSharedKeys _must_ be the last extension, don't bother padding
        when it is present. rationale from ietf-tls WG
        "Padding extension and 0-RTT" thread (2016-10-30) *)
-    if List.exists (function `PreSharedKeys _ -> true | _ -> false) cl.extensions then
+    if List.exists (function `PreSharedKeys _ -> true | _ -> false) (get_ch_extensions cl) then
       Cstruct.empty
     else
       let buflen = len bbuf + len extensions + 4 (* see above, header *) in

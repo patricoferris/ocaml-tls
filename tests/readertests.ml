@@ -1170,7 +1170,7 @@ let good_client_hellos =
   let rand = rnd @ rnd in
   let client_random = list_to_cstruct rand in
   Core.(let ch : client_hello =
-          { client_version = `TLS_1_2 ;
+          `TLS { client_version = `TLS_1_2 ;
             client_random ;
             sessionid = None ;
             ciphersuites = [] ;
@@ -1179,22 +1179,22 @@ let good_client_hellos =
         [
           (* versions *)
           ([1; 0; 0; 38; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *)] , ch ) ;
-          ([1; 0; 0; 38; 3; 0] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *)] , { ch with client_version = `SSL_3 } ) ;
-          ([1; 0; 0; 38; 3; 1] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *)] , { ch with client_version = `TLS_1_0 } ) ;
-          ([1; 0; 0; 38; 3; 2] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *)] , { ch with client_version = `TLS_1_1 } ) ;
-          ([1; 0; 0; 38; 3; 4] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *)] , { ch with client_version = `TLS_1_3 } ) ;
-          ([1; 0; 0; 38; 3; 5] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *)] , { ch with client_version = `TLS_1_X 5 } ) ;
+          ([1; 0; 0; 38; 3; 0] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *)] , Core.set_ch_version `SSL_3 ch ) ;
+          ([1; 0; 0; 38; 3; 1] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *)] , Core.set_ch_version `TLS_1_0 ch ) ;
+          ([1; 0; 0; 38; 3; 2] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *)] , Core.set_ch_version `TLS_1_1 ch ) ;
+          ([1; 0; 0; 38; 3; 4] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *)] , Core.set_ch_version `TLS_1_3 ch ) ;
+          ([1; 0; 0; 38; 3; 5] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *)] , Core.set_ch_version (`TLS_1_X 5) ch ) ;
 
           (* well-formed compression (not available in higher layer) *)
           ([1; 0; 0; 39; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 1; 0; (* exts *)] , ch ) ;
           ([1; 0; 0; 40; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 2; 0; 1; (* exts *)] , ch ) ;
 
           (* ciphersuites *)
-          ([1; 0; 0; 40; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 2; 0; 0; (* comp *) 0; (* exts *)] , { ch with ciphersuites = [Packet.TLS_NULL_WITH_NULL_NULL] } ) ;
-          ([1; 0; 0; 42; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 4; 0; 0; 0; 1; (* comp *) 0; (* exts *)] , { ch with ciphersuites = Packet.([TLS_NULL_WITH_NULL_NULL ; TLS_RSA_WITH_NULL_MD5]) } ) ;
+          ([1; 0; 0; 40; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 2; 0; 0; (* comp *) 0; (* exts *)] , Core.set_ch_ciphersuites [Packet.TLS_NULL_WITH_NULL_NULL] ch ) ;
+          ([1; 0; 0; 42; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 4; 0; 0; 0; 1; (* comp *) 0; (* exts *)] , Core.set_ch_ciphersuites Packet.([TLS_NULL_WITH_NULL_NULL ; TLS_RSA_WITH_NULL_MD5]) ch ) ;
 
           (* ignore unknown ciphersuite *)
-          ([1; 0; 0; 42; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 4; 0; 0; 0; 0x47; (* comp *) 0; (* exts *)] , { ch with ciphersuites = [Packet.TLS_NULL_WITH_NULL_NULL] } ) ;
+          ([1; 0; 0; 42; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 4; 0; 0; 0; 0x47; (* comp *) 0; (* exts *)] , Core.set_ch_ciphersuites [Packet.TLS_NULL_WITH_NULL_NULL] ch ) ;
 
           (* ignore unknown compression method *)
           ([1; 0; 0; 40; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 2; 0; 42; (* exts *)] , ch ) ;
@@ -1210,13 +1210,13 @@ let good_client_hellos =
            *)
 
           (* combine ciphersuite + compression *)
-          ([1; 0; 0; 44; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 4; 0; 0; 0; 1; (* comp *) 2; 0; 1; (* exts *)] , { ch with ciphersuites = Packet.([TLS_NULL_WITH_NULL_NULL ; TLS_RSA_WITH_NULL_MD5]) }) ;
+          ([1; 0; 0; 44; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 4; 0; 0; 0; 1; (* comp *) 2; 0; 1; (* exts *)] , Core.set_ch_ciphersuites Packet.([TLS_NULL_WITH_NULL_NULL ; TLS_RSA_WITH_NULL_MD5]) ch) ;
 
           (* session id *)
-          ([1; 0; 0; 41; 3; 3] @ rand @ [(* session id *) 3; 1; 2; 3; (* cipher *) 0; 0; (* comp *) 0; (* exts *)] , { ch with sessionid = Some (list_to_cstruct [1; 2; 3] ) } ) ;
+          ([1; 0; 0; 41; 3; 3] @ rand @ [(* session id *) 3; 1; 2; 3; (* cipher *) 0; 0; (* comp *) 0; (* exts *)] , Core.set_ch_session_id (Some (list_to_cstruct [1; 2; 3])) ch ) ;
 
           (* combine ciphersuite + compression + session id *)
-          ([1; 0; 0; 47; 3; 3] @ rand @ [(* session id *) 3; 1; 2; 3; (* cipher *) 0; 4; 0; 0; 0; 1; (* comp *) 2; 0; 1; (* exts *)] , { ch with ciphersuites = Packet.([TLS_NULL_WITH_NULL_NULL ; TLS_RSA_WITH_NULL_MD5]) ; sessionid = Some (list_to_cstruct [1; 2; 3]) }) ;
+          ([1; 0; 0; 47; 3; 3] @ rand @ [(* session id *) 3; 1; 2; 3; (* cipher *) 0; 4; 0; 0; 0; 1; (* comp *) 2; 0; 1; (* exts *)] , Core.(set_ch_ciphersuites  Packet.([TLS_NULL_WITH_NULL_NULL ; TLS_RSA_WITH_NULL_MD5]) ch |> set_ch_session_id (Some (list_to_cstruct [1; 2; 3])))) ;
 
 
           (* extensions *)
@@ -1224,37 +1224,37 @@ let good_client_hellos =
           ([1; 0; 0; 40; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 0] , ch ) ;
 
           (* some hostname *)
-          ([1; 0; 0; 52; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 12; 0; 0; 0; 8; 0; 6; 0; 0; 3; 102; 111; 111] , { ch with extensions = [`Hostname "foo"] } ) ;
+          ([1; 0; 0; 52; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 12; 0; 0; 0; 8; 0; 6; 0; 0; 3; 102; 111; 111] , Core.set_ch_extensions [`Hostname "foo"] ch ) ;
           (* some other hostname *)
-          ([1; 0; 0; 59; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 19; 0; 0; 0; 15; 0; 13; 0; 0; 10; 102; 111; 111; 98; 97; 114; 46; 99; 111; 109] , { ch with extensions = [`Hostname "foobar.com"] } ) ;
+          ([1; 0; 0; 59; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 19; 0; 0; 0; 15; 0; 13; 0; 0; 10; 102; 111; 111; 98; 97; 114; 46; 99; 111; 109] , Core.set_ch_extensions [`Hostname "foobar.com"] ch ) ;
 
           (* max fragment length *)
-          ([1; 0; 0; 45; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 5; 0; 1; 0; 1; 3] , { ch with extensions = [`MaxFragmentLength Packet.TWO_11] } ) ;
+          ([1; 0; 0; 45; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 5; 0; 1; 0; 1; 3] , Core.set_ch_extensions[`MaxFragmentLength Packet.TWO_11] ch ) ;
 
           (* empty SupportedGroups *)
-          ([1; 0; 0; 46; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 6; 0; 0xA; 0; 2; 0; 0] , { ch with extensions = [`SupportedGroups []] } ) ;
+          ([1; 0; 0; 46; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 6; 0; 0xA; 0; 2; 0; 0] , Core.set_ch_extensions [`SupportedGroups []] ch ) ;
           (* one supported group *)
-          ([1; 0; 0; 48; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 8; 0; 0xA; 0; 4; 0; 2; 0; 25] , { ch with extensions = [`SupportedGroups [Packet.SECP521R1]] } ) ;
+          ([1; 0; 0; 48; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 8; 0; 0xA; 0; 4; 0; 2; 0; 25] , Core.set_ch_extensions [`SupportedGroups [Packet.SECP521R1]] ch ) ;
           (* two supported groups *)
-          ([1; 0; 0; 50; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 10; 0; 0xA; 0; 6; 0; 4; 0; 25; 0; 24] , { ch with extensions = [`SupportedGroups Packet.([SECP521R1; SECP384R1])] } ) ;
+          ([1; 0; 0; 50; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 10; 0; 0xA; 0; 6; 0; 4; 0; 25; 0; 24] , Core.set_ch_extensions [`SupportedGroups Packet.([SECP521R1; SECP384R1])] ch ) ;
           (* three supported groups, one unknown *)
-          ([1; 0; 0; 52; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 12; 0; 0xA; 0; 8; 0; 6; 0; 25; 0xFF; 0xFF; 0; 24] , { ch with extensions = [`SupportedGroups Packet.([SECP521R1; SECP384R1])] } ) ;
+          ([1; 0; 0; 52; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 12; 0; 0xA; 0; 8; 0; 6; 0; 25; 0xFF; 0xFF; 0; 24] , Core.set_ch_extensions [`SupportedGroups Packet.([SECP521R1; SECP384R1])] ch ) ;
 
           (* secure renegotiation *)
-          ([1; 0; 0; 47; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 7; 0xFF; 1; 0; 3; 2; 1; 2] , { ch with extensions = [`SecureRenegotiation (list_to_cstruct [1;2])] } ) ;
+          ([1; 0; 0; 47; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 7; 0xFF; 1; 0; 3; 2; 1; 2] , Core.set_ch_extensions [`SecureRenegotiation (list_to_cstruct [1;2])] ch ) ;
 
           (* Padding *)
-          ([1; 0; 0; 47; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 7; 0; 21; 0; 3; 0; 0; 0] , { ch with extensions = [`Padding 3] } ) ;
+          ([1; 0; 0; 47; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 7; 0; 21; 0; 3; 0; 0; 0] , Core.set_ch_extensions [`Padding 3] ch ) ;
 
           (* signature algorithm *)
-          ([1; 0; 0; 46; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 6; 0; 13; 0; 2; 0; 0] , { ch with extensions = [`SignatureAlgorithms []] } ) ;
-          ([1; 0; 0; 48; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 8; 0; 13; 0; 4; 0; 2; 1; 1] , { ch with extensions = [`SignatureAlgorithms [`RSA_PKCS1_MD5]] } ) ;
-          ([1; 0; 0; 50; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 10; 0; 13; 0; 6; 0; 4; 2; 1; 1; 1] , { ch with extensions = [`SignatureAlgorithms [`RSA_PKCS1_SHA1; `RSA_PKCS1_MD5]] }) ;
+          ([1; 0; 0; 46; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 6; 0; 13; 0; 2; 0; 0] , Core.set_ch_extensions [`SignatureAlgorithms []] ch ) ;
+          ([1; 0; 0; 48; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 8; 0; 13; 0; 4; 0; 2; 1; 1] , Core.set_ch_extensions [`SignatureAlgorithms [`RSA_PKCS1_MD5]] ch ) ;
+          ([1; 0; 0; 50; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 10; 0; 13; 0; 6; 0; 4; 2; 1; 1; 1] , Core.set_ch_extensions [`SignatureAlgorithms [`RSA_PKCS1_SHA1; `RSA_PKCS1_MD5]] ch ) ;
           (* unknown one *)
-          ([1; 0; 0; 52; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 12; 0; 13; 0; 8; 0; 6; 42; 42; 2; 1; 1; 1] , { ch with extensions = [`SignatureAlgorithms [`RSA_PKCS1_SHA1; `RSA_PKCS1_MD5]] } ) ;
+          ([1; 0; 0; 52; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 12; 0; 13; 0; 8; 0; 6; 42; 42; 2; 1; 1; 1] , Core.set_ch_extensions [`SignatureAlgorithms [`RSA_PKCS1_SHA1; `RSA_PKCS1_MD5]] ch ) ;
 
           (* ALPN *)
-          ([1; 0; 0; 58; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 18; 0; 16; 0; 14; 0; 12; (* h2 *) 2; 104; 50; (* http/1.1*) 8; 104; 116; 116; 112; 47; 49; 46; 49] , { ch with extensions = [`ALPN ["h2"; "http/1.1"]] } ) ;
+          ([1; 0; 0; 58; 3; 3] @ rand @ [(* session id *) 0; (* cipher *) 0; 0; (* comp *) 0; (* exts *) 0; 18; 0; 16; 0; 14; 0; 12; (* h2 *) 2; 104; 50; (* http/1.1*) 8; 104; 116; 116; 112; 47; 49; 46; 49] , Core.set_ch_extensions [`ALPN ["h2"; "http/1.1"]] ch ) ;
 
           (* combinations from the real world *)
           ([0x01; (* hello *)
@@ -1273,12 +1273,10 @@ let good_client_hellos =
             0x08; 0x68; 0x74; 0x74; 0x70; 0x2f; 0x31; 0x2e; 0x31 ]
 (*           0x00; 0x23; 0x00; 0x00; (* sessionticket_tls *)
            0x00; 0x0f; 0x00; 0x01; 0x01 (* heartbeat *) *) ,
-           { ch with
-             client_version = `TLS_1_0 ;
-             client_random =  list_to_cstruct [0x7c; 0x53; 0x05; 0x72; 0x7a; 0x1b; 0x84; 0x70; 0x30; 0x89; 0xef; 0xad; 0xfb; 0x56; 0xc1; 0x3d; 0x73; 0x4b; 0xc7; 0xcb; 0x8c; 0xc8; 0x75; 0x43; 0x01; 0x12; 0x32; 0xd6; 0x74; 0x87; 0xcb; 0x18] ;
-             ciphersuites = Packet.([TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA; TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA; TLS_SRP_SHA_DSS_WITH_AES_256_CBC_SHA; TLS_SRP_SHA_RSA_WITH_AES_256_CBC_SHA; TLS_DHE_RSA_WITH_AES_256_CBC_SHA; TLS_DHE_DSS_WITH_AES_256_CBC_SHA; TLS_ECDH_RSA_WITH_AES_256_CBC_SHA; TLS_ECDH_ECDSA_WITH_AES_256_CBC_SHA; TLS_RSA_WITH_AES_256_CBC_SHA; TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA; TLS_ECDHE_ECDSA_WITH_3DES_EDE_CBC_SHA; TLS_SRP_SHA_DSS_WITH_3DES_EDE_CBC_SHA; TLS_SRP_SHA_RSA_WITH_3DES_EDE_CBC_SHA; TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA; TLS_DHE_DSS_WITH_3DES_EDE_CBC_SHA; TLS_ECDH_RSA_WITH_3DES_EDE_CBC_SHA; TLS_ECDH_ECDSA_WITH_3DES_EDE_CBC_SHA; TLS_RSA_WITH_3DES_EDE_CBC_SHA; TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA; TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA; TLS_SRP_SHA_DSS_WITH_AES_128_CBC_SHA; TLS_SRP_SHA_RSA_WITH_AES_128_CBC_SHA; TLS_DHE_RSA_WITH_AES_128_CBC_SHA; TLS_DHE_DSS_WITH_AES_128_CBC_SHA; TLS_DHE_RSA_WITH_SEED_CBC_SHA; TLS_DHE_DSS_WITH_SEED_CBC_SHA; TLS_ECDH_RSA_WITH_AES_128_CBC_SHA; TLS_ECDH_ECDSA_WITH_AES_128_CBC_SHA; TLS_RSA_WITH_AES_128_CBC_SHA; TLS_RSA_WITH_SEED_CBC_SHA; TLS_RSA_WITH_IDEA_CBC_SHA; TLS_DHE_RSA_WITH_DES_CBC_SHA; TLS_DHE_DSS_WITH_DES_CBC_SHA; TLS_RSA_WITH_DES_CBC_SHA; TLS_EMPTY_RENEGOTIATION_INFO_SCSV]);
-             extensions = [`SupportedGroups Packet.([SECP521R1; SECP384R1; SECP256R1]);
-                           `ALPN ["h2"; "http/1.1"] ] } ) ;
+           (Core.set_ch_version `TLS_1_0 ch |>
+           Core.set_ch_random (list_to_cstruct [0x7c; 0x53; 0x05; 0x72; 0x7a; 0x1b; 0x84; 0x70; 0x30; 0x89; 0xef; 0xad; 0xfb; 0x56; 0xc1; 0x3d; 0x73; 0x4b; 0xc7; 0xcb; 0x8c; 0xc8; 0x75; 0x43; 0x01; 0x12; 0x32; 0xd6; 0x74; 0x87; 0xcb; 0x18]) |>
+           Core.set_ch_ciphersuites Packet.([TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA; TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA; TLS_SRP_SHA_DSS_WITH_AES_256_CBC_SHA; TLS_SRP_SHA_RSA_WITH_AES_256_CBC_SHA; TLS_DHE_RSA_WITH_AES_256_CBC_SHA; TLS_DHE_DSS_WITH_AES_256_CBC_SHA; TLS_ECDH_RSA_WITH_AES_256_CBC_SHA; TLS_ECDH_ECDSA_WITH_AES_256_CBC_SHA; TLS_RSA_WITH_AES_256_CBC_SHA; TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA; TLS_ECDHE_ECDSA_WITH_3DES_EDE_CBC_SHA; TLS_SRP_SHA_DSS_WITH_3DES_EDE_CBC_SHA; TLS_SRP_SHA_RSA_WITH_3DES_EDE_CBC_SHA; TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA; TLS_DHE_DSS_WITH_3DES_EDE_CBC_SHA; TLS_ECDH_RSA_WITH_3DES_EDE_CBC_SHA; TLS_ECDH_ECDSA_WITH_3DES_EDE_CBC_SHA; TLS_RSA_WITH_3DES_EDE_CBC_SHA; TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA; TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA; TLS_SRP_SHA_DSS_WITH_AES_128_CBC_SHA; TLS_SRP_SHA_RSA_WITH_AES_128_CBC_SHA; TLS_DHE_RSA_WITH_AES_128_CBC_SHA; TLS_DHE_DSS_WITH_AES_128_CBC_SHA; TLS_DHE_RSA_WITH_SEED_CBC_SHA; TLS_DHE_DSS_WITH_SEED_CBC_SHA; TLS_ECDH_RSA_WITH_AES_128_CBC_SHA; TLS_ECDH_ECDSA_WITH_AES_128_CBC_SHA; TLS_RSA_WITH_AES_128_CBC_SHA; TLS_RSA_WITH_SEED_CBC_SHA; TLS_RSA_WITH_IDEA_CBC_SHA; TLS_DHE_RSA_WITH_DES_CBC_SHA; TLS_DHE_DSS_WITH_DES_CBC_SHA; TLS_RSA_WITH_DES_CBC_SHA; TLS_EMPTY_RENEGOTIATION_INFO_SCSV]) |>
+           Core.set_ch_extensions [`SupportedGroups Packet.([SECP521R1; SECP384R1; SECP256R1]); `ALPN ["h2"; "http/1.1"]]));
 
           (
             [ 0x01; (* client hello *)
@@ -1313,11 +1311,10 @@ let good_client_hellos =
               0x00; 0x10; 0x00; 0x0e; 0x00; 0x0c; (* ALPN *)
               0x02; 0x68; 0x32;
               0x08; 0x68; 0x74; 0x74; 0x70; 0x2f; 0x31; 0x2e; 0x31 ],
-            { ch with
-              client_version = `TLS_1_2 ;
-              client_random = list_to_cstruct [0xb7; 0x36; 0xeb; 0x21; 0xec; 0x81; 0x4d; 0x01; 0xfc; 0xf4; 0xe2; 0x06; 0x9a; 0x34; 0xb7; 0x21; 0xe1; 0x23; 0x6f; 0xbe; 0x50; 0xbf; 0xfe; 0x33; 0x9b; 0xc9; 0x5b; 0x20; 0x0e; 0x15; 0x02; 0x27] ;
-              ciphersuites = Packet.([TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384; TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384; TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384; TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384; TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA; TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA; TLS_SRP_SHA_DSS_WITH_AES_256_CBC_SHA; TLS_SRP_SHA_RSA_WITH_AES_256_CBC_SHA; TLS_DHE_DSS_WITH_AES_256_GCM_SHA384; TLS_DHE_RSA_WITH_AES_256_GCM_SHA384; TLS_DHE_RSA_WITH_AES_256_CBC_SHA256; TLS_DHE_DSS_WITH_AES_256_CBC_SHA256; TLS_DHE_RSA_WITH_AES_256_CBC_SHA; TLS_DHE_DSS_WITH_AES_256_CBC_SHA; TLS_ECDH_RSA_WITH_AES_256_GCM_SHA384; TLS_ECDH_ECDSA_WITH_AES_256_GCM_SHA384; TLS_ECDH_RSA_WITH_AES_256_CBC_SHA384; TLS_ECDH_ECDSA_WITH_AES_256_CBC_SHA384; TLS_ECDH_RSA_WITH_AES_256_CBC_SHA; TLS_ECDH_ECDSA_WITH_AES_256_CBC_SHA; TLS_RSA_WITH_AES_256_GCM_SHA384; TLS_RSA_WITH_AES_256_CBC_SHA256; TLS_RSA_WITH_AES_256_CBC_SHA; TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA; TLS_ECDHE_ECDSA_WITH_3DES_EDE_CBC_SHA; TLS_SRP_SHA_DSS_WITH_3DES_EDE_CBC_SHA; TLS_SRP_SHA_RSA_WITH_3DES_EDE_CBC_SHA; TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA; TLS_DHE_DSS_WITH_3DES_EDE_CBC_SHA; TLS_ECDH_RSA_WITH_3DES_EDE_CBC_SHA; TLS_ECDH_ECDSA_WITH_3DES_EDE_CBC_SHA; TLS_RSA_WITH_3DES_EDE_CBC_SHA; TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256; TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256; TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256; TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256; TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA; TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA; TLS_SRP_SHA_DSS_WITH_AES_128_CBC_SHA; TLS_SRP_SHA_RSA_WITH_AES_128_CBC_SHA; TLS_DHE_DSS_WITH_AES_128_GCM_SHA256; TLS_DHE_RSA_WITH_AES_128_GCM_SHA256; TLS_DHE_RSA_WITH_AES_128_CBC_SHA256; TLS_DHE_DSS_WITH_AES_128_CBC_SHA256; TLS_DHE_RSA_WITH_AES_128_CBC_SHA; TLS_DHE_DSS_WITH_AES_128_CBC_SHA; TLS_DHE_RSA_WITH_SEED_CBC_SHA; TLS_DHE_DSS_WITH_SEED_CBC_SHA; TLS_ECDH_RSA_WITH_AES_128_GCM_SHA256; TLS_ECDH_ECDSA_WITH_AES_128_GCM_SHA256; TLS_ECDH_RSA_WITH_AES_128_CBC_SHA256; TLS_ECDH_ECDSA_WITH_AES_128_CBC_SHA256; TLS_ECDH_RSA_WITH_AES_128_CBC_SHA; TLS_ECDH_ECDSA_WITH_AES_128_CBC_SHA; TLS_RSA_WITH_AES_128_GCM_SHA256; TLS_RSA_WITH_AES_128_CBC_SHA256; TLS_RSA_WITH_AES_128_CBC_SHA; TLS_RSA_WITH_SEED_CBC_SHA; TLS_RSA_WITH_IDEA_CBC_SHA; TLS_DHE_RSA_WITH_DES_CBC_SHA; TLS_DHE_DSS_WITH_DES_CBC_SHA; TLS_RSA_WITH_DES_CBC_SHA; TLS_EMPTY_RENEGOTIATION_INFO_SCSV]) ;
-              extensions = [`SupportedGroups Packet.([SECP521R1; SECP384R1; SECP256R1]);
+            Core.set_ch_version `TLS_1_2 ch |>
+            Core.set_ch_random (list_to_cstruct [0xb7; 0x36; 0xeb; 0x21; 0xec; 0x81; 0x4d; 0x01; 0xfc; 0xf4; 0xe2; 0x06; 0x9a; 0x34; 0xb7; 0x21; 0xe1; 0x23; 0x6f; 0xbe; 0x50; 0xbf; 0xfe; 0x33; 0x9b; 0xc9; 0x5b; 0x20; 0x0e; 0x15; 0x02; 0x27]) |>
+            Core.set_ch_ciphersuites Packet.([TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384; TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384; TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384; TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384; TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA; TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA; TLS_SRP_SHA_DSS_WITH_AES_256_CBC_SHA; TLS_SRP_SHA_RSA_WITH_AES_256_CBC_SHA; TLS_DHE_DSS_WITH_AES_256_GCM_SHA384; TLS_DHE_RSA_WITH_AES_256_GCM_SHA384; TLS_DHE_RSA_WITH_AES_256_CBC_SHA256; TLS_DHE_DSS_WITH_AES_256_CBC_SHA256; TLS_DHE_RSA_WITH_AES_256_CBC_SHA; TLS_DHE_DSS_WITH_AES_256_CBC_SHA; TLS_ECDH_RSA_WITH_AES_256_GCM_SHA384; TLS_ECDH_ECDSA_WITH_AES_256_GCM_SHA384; TLS_ECDH_RSA_WITH_AES_256_CBC_SHA384; TLS_ECDH_ECDSA_WITH_AES_256_CBC_SHA384; TLS_ECDH_RSA_WITH_AES_256_CBC_SHA; TLS_ECDH_ECDSA_WITH_AES_256_CBC_SHA; TLS_RSA_WITH_AES_256_GCM_SHA384; TLS_RSA_WITH_AES_256_CBC_SHA256; TLS_RSA_WITH_AES_256_CBC_SHA; TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA; TLS_ECDHE_ECDSA_WITH_3DES_EDE_CBC_SHA; TLS_SRP_SHA_DSS_WITH_3DES_EDE_CBC_SHA; TLS_SRP_SHA_RSA_WITH_3DES_EDE_CBC_SHA; TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA; TLS_DHE_DSS_WITH_3DES_EDE_CBC_SHA; TLS_ECDH_RSA_WITH_3DES_EDE_CBC_SHA; TLS_ECDH_ECDSA_WITH_3DES_EDE_CBC_SHA; TLS_RSA_WITH_3DES_EDE_CBC_SHA; TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256; TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256; TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256; TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256; TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA; TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA; TLS_SRP_SHA_DSS_WITH_AES_128_CBC_SHA; TLS_SRP_SHA_RSA_WITH_AES_128_CBC_SHA; TLS_DHE_DSS_WITH_AES_128_GCM_SHA256; TLS_DHE_RSA_WITH_AES_128_GCM_SHA256; TLS_DHE_RSA_WITH_AES_128_CBC_SHA256; TLS_DHE_DSS_WITH_AES_128_CBC_SHA256; TLS_DHE_RSA_WITH_AES_128_CBC_SHA; TLS_DHE_DSS_WITH_AES_128_CBC_SHA; TLS_DHE_RSA_WITH_SEED_CBC_SHA; TLS_DHE_DSS_WITH_SEED_CBC_SHA; TLS_ECDH_RSA_WITH_AES_128_GCM_SHA256; TLS_ECDH_ECDSA_WITH_AES_128_GCM_SHA256; TLS_ECDH_RSA_WITH_AES_128_CBC_SHA256; TLS_ECDH_ECDSA_WITH_AES_128_CBC_SHA256; TLS_ECDH_RSA_WITH_AES_128_CBC_SHA; TLS_ECDH_ECDSA_WITH_AES_128_CBC_SHA; TLS_RSA_WITH_AES_128_GCM_SHA256; TLS_RSA_WITH_AES_128_CBC_SHA256; TLS_RSA_WITH_AES_128_CBC_SHA; TLS_RSA_WITH_SEED_CBC_SHA; TLS_RSA_WITH_IDEA_CBC_SHA; TLS_DHE_RSA_WITH_DES_CBC_SHA; TLS_DHE_DSS_WITH_DES_CBC_SHA; TLS_RSA_WITH_DES_CBC_SHA; TLS_EMPTY_RENEGOTIATION_INFO_SCSV]) |>
+            Core.set_ch_extensions [`SupportedGroups Packet.([SECP521R1; SECP384R1; SECP256R1]);
                             `SignatureAlgorithms
                               [`RSA_PKCS1_SHA512 ;
                                `RSA_PKCS1_SHA384 ;
@@ -1325,7 +1322,7 @@ let good_client_hellos =
                                `RSA_PKCS1_SHA224 ;
                                `RSA_PKCS1_SHA1 ] ;
                             `Padding 203 ;
-                            `ALPN ["h2"; "http/1.1"] ] } );
+                            `ALPN ["h2"; "http/1.1"] ]);
 
 
           ( [ 0x01; (* client hello *)
@@ -1344,10 +1341,10 @@ let good_client_hellos =
               0x02; 0x68; 0x32;
               0x08; 0x68; 0x74; 0x74; 0x70; 0x2f; 0x31; 0x2e; 0x31
             ],
-            { ch with client_version = `TLS_1_3 ;
-                      client_random = list_to_cstruct [ 0xf1; 0xb2; 0x50; 0x16; 0x4b; 0x77; 0x50; 0xb3; 0xdc; 0xcb; 0x1c; 0x6a; 0xae; 0x1a; 0x94; 0x87; 0xc4; 0x17; 0xbb; 0xa4; 0xf7; 0x92; 0xf8; 0x16; 0x56; 0x12; 0x03; 0x38; 0x1e; 0xe5; 0xc1; 0xae ] ;
-                      ciphersuites = Packet.([TLS_RSA_WITH_AES_256_CBC_SHA ; TLS_DHE_RSA_WITH_AES_256_CBC_SHA ; TLS_RSA_WITH_AES_128_CBC_SHA ; TLS_DHE_RSA_WITH_AES_128_CBC_SHA ; TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA ; TLS_RSA_WITH_3DES_EDE_CBC_SHA]) ;
-                      extensions = [ `SecureRenegotiation (Cstruct.create 0) ;
+            Core.set_ch_version `TLS_1_3 ch |>
+            Core.set_ch_random (list_to_cstruct [ 0xf1; 0xb2; 0x50; 0x16; 0x4b; 0x77; 0x50; 0xb3; 0xdc; 0xcb; 0x1c; 0x6a; 0xae; 0x1a; 0x94; 0x87; 0xc4; 0x17; 0xbb; 0xa4; 0xf7; 0x92; 0xf8; 0x16; 0x56; 0x12; 0x03; 0x38; 0x1e; 0xe5; 0xc1; 0xae ]) |>
+            Core.set_ch_ciphersuites Packet.([TLS_RSA_WITH_AES_256_CBC_SHA ; TLS_DHE_RSA_WITH_AES_256_CBC_SHA ; TLS_RSA_WITH_AES_128_CBC_SHA ; TLS_DHE_RSA_WITH_AES_128_CBC_SHA ; TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA ; TLS_RSA_WITH_3DES_EDE_CBC_SHA]) |>
+            Core.set_ch_extensions [ `SecureRenegotiation (Cstruct.create 0) ;
                                      `Hostname "127.0.0.1" ;
                                      `SignatureAlgorithms
                                        [`RSA_PKCS1_SHA512 ;
@@ -1355,18 +1352,16 @@ let good_client_hellos =
                                         `RSA_PKCS1_SHA256 ;
                                         `RSA_PKCS1_SHA1 ;
                                         `RSA_PKCS1_MD5] ;
-                                      `ALPN ["h2"; "http/1.1"] ]
-            }
-          )
+                                      `ALPN ["h2"; "http/1.1"] ])
 ])
 
 let cmp_client_hellos ch ch' =
   let open Core in
-  assert_equal ch.client_version ch'.client_version ;
-  assert_cs_eq ch.client_random ch'.client_random ;
-  assert_sessionid_equal ch.sessionid ch'.sessionid ;
-  assert_lists_eq assert_equal ch.ciphersuites ch'.ciphersuites ;
-  assert_lists_eq assert_client_extension_equal ch.extensions ch'.extensions
+  assert_equal (get_ch_version ch) (get_ch_version ch') ;
+  assert_cs_eq (get_ch_random ch) (get_ch_random ch') ;
+  assert_sessionid_equal (get_ch_session_id ch) (get_ch_session_id ch') ;
+  assert_lists_eq assert_equal (get_ch_ciphersuites ch) (get_ch_ciphersuites ch') ;
+  assert_lists_eq assert_client_extension_equal (get_ch_extensions ch) (get_ch_extensions ch')
 
 let good_client_hellos_parser (xs, res) _ =
   let buf = list_to_cstruct xs in

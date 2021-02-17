@@ -542,7 +542,7 @@ let parse_client_hello buf =
      match List.rev extensions with
      | `PreSharedKeys _::_ -> ()
      | _ -> raise_unknown "Pre-shared key extension exists, but is not the last");
-  ClientHello { client_version ; client_random ; sessionid ; ciphersuites ; extensions }
+  ClientHello (`TLS { client_version ; client_random ; sessionid ; ciphersuites ; extensions })
 
 let parse_server_hello buf =
   let server_version = parse_version_exn buf in

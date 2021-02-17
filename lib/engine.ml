@@ -676,9 +676,8 @@ let client config =
   in
 
   let client_hello =
-    { dch with
-        ciphersuites = dch.ciphersuites @ ciphers ;
-        extensions   = dch.extensions @ extensions }
+    set_ch_ciphersuites ((get_ch_ciphersuites dch) @ ciphers) dch |> 
+    set_ch_extensions ((get_ch_extensions dch) @ extensions)
   in
 
   let client_hello, ch, raw =
@@ -707,7 +706,7 @@ let client config =
 
       let hash = Cstruct.create (Mirage_crypto.Hash.digest_size (Ciphersuite.hash13 cipher)) in
       let incomplete_psks = [ (psk.identifier, obf_age), hash ] in
-      let ch' = { client_hello with extensions = client_hello.extensions @ [ kex ; `PreSharedKeys incomplete_psks ] } in
+      let ch' = set_ch_extensions (get_ch_extensions client_hello @ [ kex ; `PreSharedKeys incomplete_psks ]) client_hello in 
       let ch'_raw = Writer.assemble_handshake (ClientHello ch') in
 
       let binders_len = binders_len incomplete_psks in
@@ -720,7 +719,7 @@ let client config =
       let raw = Cstruct.concat [ ch_part ; prefix ; binder ] in
 
       let psks = [(psk.identifier, obf_age), binder] in
-      let client_hello' = { client_hello with extensions = client_hello.extensions @ [ kex ; `PreSharedKeys psks ] } in
+      let client_hello' = set_ch_extensions (get_ch_extensions client_hello @ [ kex ; `PreSharedKeys psks ]) client_hello in
       let ch' = ClientHello client_hello' in
       client_hello', ch', raw
   in

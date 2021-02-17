@@ -10,21 +10,21 @@ let answer_client_hello ~hrr state ch raw =
   (match client_hello_valid `TLS_1_3 ch with
    | `Error e -> fail (`Fatal (`InvalidClientHello e))
    | `Ok -> return () ) >>= fun () ->
-  (if hrr && List.mem `EarlyDataIndication ch.extensions then
+  (if hrr && List.mem `EarlyDataIndication (get_ch_extensions ch) then
      fail (`Fatal (`InvalidClientHello `Has0rttAfterHRR))
    else
      return ()) >>= fun () ->
   Tracing.sexpf ~tag:"version" ~f:sexp_of_tls_version `TLS_1_3 ;
 
   let ciphers =
-    filter_map ~f:Ciphersuite.any_ciphersuite_to_ciphersuite13 ch.ciphersuites
+    filter_map ~f:Ciphersuite.any_ciphersuite_to_ciphersuite13 (get_ch_ciphersuites ch)
   in
 
-  ( match map_find ~f:(function `SupportedGroups gs -> Some gs | _ -> None) ch.extensions with
+  ( match map_find ~f:(function `SupportedGroups gs -> Some gs | _ -> None) (get_ch_extensions ch) with
     | None -> fail (`Fatal (`InvalidClientHello `NoSupportedGroupExtension))
     | Some gs -> return (filter_map ~f:Core.named_group_to_group gs )) >>= fun groups ->
 
-  ( match map_find ~f:(function `KeyShare ks -> Some ks | _ -> None) ch.extensions with
+  ( match map_find ~f:(function `KeyShare ks -> Some ks | _ -> None) (get_ch_extensions ch) with
     | None -> fail (`Fatal (`InvalidClientHello `NoKeyShareExtension))
     | Some ks ->
        let f acc (g, ks) =
@@ -41,7 +41,7 @@ let answer_client_hello ~hrr state ch raw =
     let sh =
       { server_version = `TLS_1_3 ;
         server_random = Mirage_crypto_rng.generate 32 ;
-        sessionid = ch.sessionid ;
+        sessionid = (get_ch_session_id ch) ;
         ciphersuite ;
         extensions }
     in
@@ -50,7 +50,7 @@ let answer_client_hello ~hrr state ch raw =
       let common_session_data13 = {
         base.common_session_data13 with
         server_random = sh.server_random ;
-        client_random = ch.client_random ;
+        client_random = (get_ch_random ch) ;
       } in
       let resumed = match epoch with None -> false | Some _ -> true in
       { base with common_session_data13 ; ciphersuite13 = cipher ; resumed }
@@ -76,16 +76,16 @@ let answer_client_hello ~hrr state ch raw =
         | None -> fail (`Fatal `NoSupportedGroup)
         | Some group ->
           let cookie = Mirage_crypto.Hash.digest (Ciphersuite.hash13 cipher) raw in
-          let hrr = { retry_version = `TLS_1_3 ; ciphersuite = cipher ; sessionid = ch.sessionid ; selected_group = group ; extensions = [ `Cookie cookie ] } in
+          let hrr = { retry_version = `TLS_1_3 ; ciphersuite = cipher ; sessionid = (get_ch_session_id ch) ; selected_group = group ; extensions = [ `Cookie cookie ] } in
           let hrr_raw = Writer.assemble_handshake (HelloRetryRequest hrr) in
           Tracing.sexpf ~tag:"handshake-out" ~f:sexp_of_tls_handshake (HelloRetryRequest hrr) ;
           (* there is no early data anymore if HRR was sent (see 4.1.2) *)
           (* but the client wouldn't know until it received the HRR *)
-          let early_data_left = if List.mem `EarlyDataIndication ch.extensions then config.Config.zero_rtt else 0l in
+          let early_data_left = if List.mem `EarlyDataIndication (get_ch_extensions ch) then config.Config.zero_rtt else 0l in
           let machina = Server13 AwaitClientHelloHRR13 in
           return ({ state with early_data_left ; machina },
                   `Record (Packet.HANDSHAKE, hrr_raw) ::
-                  (match ch.sessionid with
+                  (match (get_ch_session_id ch) with
                    | None -> []
                    | Some _ -> [`Record change_cipher_spec]))
       end
@@ -99,12 +99,12 @@ let answer_client_hello ~hrr state ch raw =
       (* DHE - full handshake *)
 
       (if hrr then
-         match map_find ~f:(function `Cookie c -> Some c | _ -> None) ch.extensions with
+         match map_find ~f:(function `Cookie c -> Some c | _ -> None) (get_ch_extensions ch) with
          | None -> fail (`Fatal (`InvalidClientHello `NoCookie))
          | Some c ->
            (* log is: 254 00 00 length c :: HRR *)
            let hash_hdr = Writer.assemble_message_hash (Cstruct.len c) in
-           let hrr = { retry_version = `TLS_1_3 ; ciphersuite = cipher ; sessionid = ch.sessionid ; selected_group = group ; extensions = [ `Cookie c ]} in
+           let hrr = { retry_version = `TLS_1_3 ; ciphersuite = cipher ; sessionid = (get_ch_session_id ch) ; selected_group = group ; extensions = [ `Cookie c ]} in
            let hs_buf = Writer.assemble_handshake (HelloRetryRequest hrr) in
            return (Cstruct.concat [ hash_hdr ; c ; hs_buf ])
        else
@@ -118,8 +118,8 @@ let answer_client_hello ~hrr state ch raw =
         let no_resume = secret (), None, [], false in
         match
           config.Config.ticket_cache,
-          map_find ~f:(function `PreSharedKeys ids -> Some ids | _ -> None) ch.extensions,
-          map_find ~f:(function `PskKeyExchangeModes ms -> Some ms | _ -> None) ch.extensions
+          map_find ~f:(function `PreSharedKeys ids -> Some ids | _ -> None) (get_ch_extensions ch),
+          map_find ~f:(function `PskKeyExchangeModes ms -> Some ms | _ -> None) (get_ch_extensions ch)
         with
         | None, _, _ | _, None, _ -> no_resume
         | Some _, Some _, None -> no_resume (* should this lead to an error instead? *)
@@ -187,7 +187,7 @@ let answer_client_hello ~hrr state ch raw =
                         let binder' = Handshake_crypto13.finished early_secret.hash binder_key log in
                         if Cstruct.equal binder binder' then begin
                           (* from 4.1.2 - earlydata is not allowed after hrr *)
-                          let zero = idx = 0 && not hrr && List.mem `EarlyDataIndication ch.extensions in
+                          let zero = idx = 0 && not hrr && List.mem `EarlyDataIndication (get_ch_extensions ch) in
                           early_secret, Some old_epoch, [ `PreSharedKey idx ], zero
                         end else
                           no_resume
@@ -268,7 +268,7 @@ let answer_client_hello ~hrr state ch raw =
           Tracing.sexpf ~tag:"handshake-out" ~f:sexp_of_tls_handshake cert ;
           let log = log <+> cert_raw in
 
-          ( match map_find ~f:(function `SignatureAlgorithms sa -> Some sa | _ -> None) ch.extensions with
+          ( match map_find ~f:(function `SignatureAlgorithms sa -> Some sa | _ -> None) (get_ch_extensions ch) with
                 | None -> fail (`Fatal (`InvalidClientHello `NoSignatureAlgorithmsExtension))
                 | Some sa -> return sa ) >>= fun sigalgs ->
           (* TODO respect certificate_signature_algs if present *)
@@ -336,10 +336,10 @@ let answer_client_hello ~hrr state ch raw =
           (AwaitClientFinished13 (client_hs_secret, client_app_ctx, st, log),
            `TLS13 session :: state.session)
       in
-      let early_data_left = if List.mem `EarlyDataIndication ch.extensions then config.Config.zero_rtt else 0l in
+      let early_data_left = if List.mem `EarlyDataIndication (get_ch_extensions ch) then config.Config.zero_rtt else 0l in
       ({ state with machina = Server13 st ; session ; early_data_left },
        `Record (Packet.HANDSHAKE, sh_raw) ::
-       (match ch.sessionid with
+       (match (get_ch_session_id ch) with
         | Some _ when not hrr -> [`Record change_cipher_spec]
         | _ -> []) @
        [ `Change_enc server_ctx ;

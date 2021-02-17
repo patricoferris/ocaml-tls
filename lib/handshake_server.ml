@@ -158,7 +158,7 @@ let answer_client_key_exchange_DHE_RSA state session secret kex raw log =
 let sig_algs (client_hello : client_hello) =
   map_find
     ~f:(function `SignatureAlgorithms xs -> Some xs | _ -> None)
-    client_hello.extensions
+    (get_ch_extensions client_hello)
 
 let ecc_group configured_groups requested_groups =
   first_match requested_groups configured_groups
@@ -205,7 +205,7 @@ let server_hello config (client_hello : client_hello) (session : session_data) v
     | None -> []
     | Some protocol -> [`ALPN protocol]
   and ecpointformat =
-    match map_find ~f:(function `ECPointFormats -> Some () | _ -> None) client_hello.extensions with
+    match map_find ~f:(function `ECPointFormats -> Some () | _ -> None) (get_ch_extensions client_hello) with
     | Some () when Ciphersuite.ecc session.ciphersuite -> [ `ECPointFormats ]
     | _ -> []
   in
@@ -227,7 +227,7 @@ let answer_client_hello_common state reneg ch raw =
   let process_client_hello ch config =
     let host = hostname ch
     and groups = groups ch
-    and cciphers = filter_map ~f:Ciphersuite.any_ciphersuite_to_ciphersuite ch.ciphersuites
+    and cciphers = filter_map ~f:Ciphersuite.any_ciphersuite_to_ciphersuite (get_ch_ciphersuites ch)
     in
     let configured_ecc_groups, other_groups = List.partition Config.elliptic_curve config.groups in
     let ecc_group = ecc_group configured_ecc_groups groups
@@ -243,9 +243,9 @@ let answer_client_hello_common state reneg ch raw =
       | Some x -> return x
       | None   -> match first_match cciphers Config.Ciphers.supported with
         | Some _ -> fail (`Error (`NoConfiguredCiphersuite cciphers))
-        | None -> fail (`Fatal (`InvalidClientHello (`NoSupportedCiphersuite ch.ciphersuites))) ) >>= fun cipher ->
+        | None -> fail (`Fatal (`InvalidClientHello (`NoSupportedCiphersuite (get_ch_ciphersuites ch)))) ) >>= fun cipher ->
 
-    let extended_ms = List.mem `ExtendedMasterSecret ch.extensions in
+    let extended_ms = List.mem `ExtendedMasterSecret (get_ch_extensions ch) in
 
     Tracing.sexpf ~tag:"cipher" ~f:Ciphersuite.sexp_of_ciphersuite cipher ;
 
@@ -263,7 +263,7 @@ let answer_client_hello_common state reneg ch raw =
       let session = empty_session in
       let common_session_data = {
         session.common_session_data with
-        client_random    = ch.client_random ;
+        client_random    = get_ch_random ch ;
         own_certificate  = chain ;
         own_private_key  = priv ;
         own_name         = own_name ;
@@ -271,7 +271,7 @@ let answer_client_hello_common state reneg ch raw =
       } in
       { session with
         common_session_data ;
-        client_version   = ch.client_version ;
+        client_version   = get_ch_version ch ;
         ciphersuite      = cipher ;
         group            = group ;
         extended_ms      = extended_ms ;
@@ -383,8 +383,8 @@ let answer_client_hello_common state reneg ch raw =
 (* TODO could benefit from result monadd *)
 let agreed_version supported (client_hello : client_hello) =
   let raw_client_versions =
-    match Utils.filter_map ~f:(function `SupportedVersions vs -> Some vs | _ -> None) client_hello.extensions with
-    | [] -> [client_hello.client_version]
+    match Utils.filter_map ~f:(function `SupportedVersions vs -> Some vs | _ -> None) (get_ch_extensions client_hello) with
+    | [] -> [(get_ch_version client_hello)]
     | [vs] -> vs
     | _ -> invalid_arg "bad supported version extension"
   in
@@ -423,16 +423,16 @@ let answer_client_hello state (ch : client_hello) raw =
              (List.mem `ExtendedMasterSecret extensions && epoch.extended_ms))
     in
 
-    match option None state.config.session_cache ch.sessionid with
-    | Some epoch when epoch_matches epoch (version_to_tls state.protocol_version) ch.ciphersuites ch.extensions ->
+    match option None state.config.session_cache (get_ch_session_id ch) with
+    | Some epoch when epoch_matches epoch (version_to_tls state.protocol_version) (get_ch_ciphersuites ch) (get_ch_extensions ch) ->
       let session =
         let session = session_of_epoch epoch in
         let common_session_data = {
           session.common_session_data with
-          client_random = ch.client_random ;
+          client_random = (get_ch_random ch) ;
           client_auth = (epoch.peer_certificate <> None) ;
         } in
-        { session with common_session_data ; client_version = ch.client_version }
+        { session with common_session_data ; client_version = (get_ch_version ch) }
       in
       Some session
     | _ -> None
@@ -464,14 +464,14 @@ let answer_client_hello state (ch : client_hello) raw =
   in
 
   let process_client_hello config ch version =
-    let cciphers = ch.ciphersuites in
+    let cciphers = (get_ch_ciphersuites ch) in
     (match client_hello_valid version ch with
      | `Ok -> return ()
      | `Error e -> fail (`Fatal (`InvalidClientHello e))) >>= fun () ->
     guard (not (List.mem Packet.TLS_FALLBACK_SCSV cciphers) ||
            version = max_protocol_version config.protocol_versions)
       (`Fatal `InappropriateFallback) >>= fun () ->
-    let theirs = get_secure_renegotiation ch.extensions in
+    let theirs = get_secure_renegotiation (get_ch_extensions ch) in
     ensure_reneg cciphers theirs
   in
 
@@ -501,7 +501,7 @@ let answer_client_hello_reneg state (ch : client_hello) raw =
      | `Error x -> fail (`Fatal (`InvalidClientHello x))) >>= fun () ->
     agreed_version config.protocol_versions ch >>= fun version ->
     guard (version = oldversion) (`Fatal (`InvalidRenegotiationVersion version)) >>= fun () ->
-    let theirs = get_secure_renegotiation ch.extensions in
+    let theirs = get_secure_renegotiation (get_ch_extensions ch) in
     ensure_reneg ours theirs >|= fun () ->
     version
   in

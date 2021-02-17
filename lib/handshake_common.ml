@@ -29,16 +29,22 @@ let host_name_opt = function
       | Ok host -> Some host
 
 let hostname (h : client_hello) : [ `host ] Domain_name.t option =
-  host_name_opt
-    (map_find ~f:(function `Hostname s -> Some s | _ -> None) h.extensions)
+  match h with 
+    | `TLS h -> 
+      host_name_opt
+        (map_find ~f:(function `Hostname s -> Some s | _ -> None) h.extensions)
+    | `DTLS _ -> None
 
 let groups (h : client_hello) =
-  match map_find ~f:(function `SupportedGroups g -> Some g | _ -> None) h.extensions with
-  | Some xs ->
-    List.fold_left (fun acc g ->
-        match named_group_to_group g with Some g -> g :: acc | _ -> acc)
-      [] xs
-  | None -> []
+  match h with 
+    | `DTLS _ -> []
+    | `TLS h -> 
+      match map_find ~f:(function `SupportedGroups g -> Some g | _ -> None) h.extensions with
+      | Some xs ->
+        List.fold_left (fun acc g ->
+            match named_group_to_group g with Some g -> g :: acc | _ -> acc)
+          [] xs
+      | None -> []
 
 let rec find_matching host certs =
   match certs with
@@ -72,7 +78,7 @@ let get_secure_renegotiation exts =
     ~f:(function `SecureRenegotiation data -> Some data | _ -> None)
 
 let get_alpn_protocols (ch : client_hello) =
-  map_find ~f:(function `ALPN protocols -> Some protocols | _ -> None) ch.extensions
+  map_find ~f:(function `ALPN protocols -> Some protocols | _ -> None) (get_ch_extensions ch)
 
 let alpn_protocol config ch =
   match config.Config.alpn_protocols, get_alpn_protocols ch with
@@ -247,15 +253,15 @@ let client_hello_valid version (ch : client_hello) =
   let sig_alg =
     map_find
       ~f:(function `SignatureAlgorithms sa -> Some sa | _ -> None)
-      ch.extensions
+      (get_ch_extensions ch)
   and key_share =
     map_find
       ~f:(function `KeyShare ks -> Some ks | _ -> None)
-      ch.extensions
+      (get_ch_extensions ch)
   and groups =
     map_find
       ~f:(function `SupportedGroups gs -> Some gs | _ -> None)
-      ch.extensions
+      (get_ch_extensions ch)
   in
 
   let version_good = match version with
@@ -288,22 +294,22 @@ let client_hello_valid version (ch : client_hello) =
 
   let share_ciphers =
     match
-      first_match (filter_map ~f:Ciphersuite.any_ciphersuite_to_ciphersuite ch.ciphersuites) Config.Ciphers.supported
+      first_match (filter_map ~f:Ciphersuite.any_ciphersuite_to_ciphersuite (get_ch_ciphersuites ch)) Config.Ciphers.supported
     with
     | None -> false
     | Some _ -> true
   in
   match
-    not (empty ch.ciphersuites),
-    List_set.is_proper_set ch.ciphersuites,
+    not (empty (get_ch_ciphersuites ch)),
+    List_set.is_proper_set (get_ch_ciphersuites ch),
     share_ciphers,
-    List_set.is_proper_set (extension_types to_client_ext_type ch.extensions)
+    List_set.is_proper_set (extension_types to_client_ext_type (get_ch_extensions ch))
   with
   | true, _, true, true -> version_good
   | false, _ , _, _ -> `Error `EmptyCiphersuites
   (*  | _, false, _, _ -> `Error (`NotSetCiphersuites ch.ciphersuites) *)
-  | _, _, false, _ -> `Error (`NoSupportedCiphersuite ch.ciphersuites)
-  | _, _, _, false -> `Error (`NotSetExtension ch.extensions)
+  | _, _, false, _ -> `Error (`NoSupportedCiphersuite (get_ch_ciphersuites ch))
+  | _, _, _, false -> `Error (`NotSetExtension (get_ch_extensions ch))
 
 
 let server_hello_valid (sh : server_hello) =

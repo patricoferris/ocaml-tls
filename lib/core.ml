@@ -323,13 +323,63 @@ type hello_retry_extension = [
   | `UnknownExtension of (int * Cstruct_sexp.t)
 ] [@@deriving sexp]
 
-type client_hello = {
+type tls_hello = {
   client_version : any_version;
   client_random  : Cstruct_sexp.t;
   sessionid      : SessionID.t option;
   ciphersuites   : any_ciphersuite list;
-  extensions     : client_extension list
+  extensions     : client_extension list;
 } [@@deriving sexp]
+
+type dtls_hello = {
+  client_version : any_version;
+  client_random  : Cstruct_sexp.t;
+  sessionid      : SessionID.t option;
+  cookie         : int;
+  ciphersuites   : any_ciphersuite list;
+} [@@deriving sexp]
+
+type client_hello = [`TLS of tls_hello | `DTLS of dtls_hello ][@@deriving sexp]
+
+let get_ch_version : client_hello -> any_version = function 
+  | `TLS ch -> ch.client_version
+  | `DTLS ch -> ch.client_version
+
+let set_ch_version : any_version -> client_hello -> client_hello = fun client_version -> function 
+  | `TLS ch -> `TLS { ch with client_version }
+  | `DTLS ch -> `DTLS { ch with client_version }
+
+let get_ch_session_id  : client_hello -> SessionID.t option = function 
+  | `TLS ch -> ch.sessionid
+  | `DTLS ch -> ch.sessionid
+
+let set_ch_session_id  : SessionID.t option -> client_hello -> client_hello = fun sessionid -> function 
+  | `TLS ch -> `TLS { ch with sessionid }
+  | `DTLS ch -> `DTLS { ch with sessionid }
+
+let get_ch_random : client_hello -> Cstruct_sexp.t = function 
+  | `TLS ch -> ch.client_random
+  | `DTLS ch -> ch.client_random
+
+let set_ch_random : Cstruct_sexp.t -> client_hello -> client_hello = fun client_random -> function 
+  | `TLS ch -> `TLS { ch with client_random }
+  | `DTLS ch -> `DTLS { ch with client_random }
+
+let get_ch_ciphersuites : client_hello -> any_ciphersuite list = function 
+  | `TLS ch -> ch.ciphersuites
+  | `DTLS ch -> ch.ciphersuites
+
+let set_ch_ciphersuites : any_ciphersuite list -> client_hello -> client_hello = fun ciphersuites -> function 
+  | `TLS ch -> `TLS { ch with ciphersuites }
+  | `DTLS ch -> `DTLS { ch with ciphersuites }
+
+let get_ch_extensions : client_hello -> client_extension list = function 
+  | `TLS ch -> ch.extensions
+  | `DTLS _ -> []
+
+let set_ch_extensions : client_extension list -> client_hello -> client_hello = fun extensions -> function 
+  | `TLS ch -> `TLS { ch with extensions }
+  | `DTLS _ as x -> x
 
 type server_hello = {
   server_version : tls_version_with_dtls;

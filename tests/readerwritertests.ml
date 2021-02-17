@@ -352,7 +352,7 @@ let rw_handshake_client_hello_vals =
   let rnd = [ 0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15 ] in
   let client_random = list_to_cstruct (rnd @ rnd) in
   Core.(let ch : client_hello =
-          { client_version = `TLS_1_2 ;
+          `TLS { client_version = `TLS_1_2 ;
             client_random ;
             sessionid = None ;
             ciphersuites = [] ;
@@ -360,58 +360,54 @@ let rw_handshake_client_hello_vals =
         in
         [
           ClientHello ch ;
-          ClientHello { ch with client_version = `TLS_1_0 } ;
-          ClientHello { ch with client_version = `TLS_1_1 } ;
+          ClientHello (set_ch_version `TLS_1_0 ch) ;
+          ClientHello (set_ch_version `TLS_1_1 ch) ;
 
-          ClientHello { ch with ciphersuites = [ Packet.TLS_NULL_WITH_NULL_NULL ] } ;
-          ClientHello { ch with ciphersuites = Packet.([ TLS_NULL_WITH_NULL_NULL ; TLS_RSA_WITH_NULL_MD5 ; TLS_RSA_WITH_AES_256_CBC_SHA ]) } ;
+          ClientHello (set_ch_ciphersuites [ Packet.TLS_NULL_WITH_NULL_NULL ] ch ) ;
+          ClientHello (set_ch_ciphersuites Packet.([ TLS_NULL_WITH_NULL_NULL ; TLS_RSA_WITH_NULL_MD5 ; TLS_RSA_WITH_AES_256_CBC_SHA ]) ch) ;
 
-          ClientHello { ch with sessionid = (Some (list_to_cstruct rnd)) } ;
-          ClientHello { ch with sessionid = (Some client_random) } ;
+          ClientHello (set_ch_session_id (Some (list_to_cstruct rnd)) ch) ;
+          ClientHello (set_ch_session_id (Some client_random) ch) ;
 
-          ClientHello { ch with
-                        ciphersuites = Packet.([ TLS_NULL_WITH_NULL_NULL ; TLS_RSA_WITH_NULL_MD5 ; TLS_RSA_WITH_AES_256_CBC_SHA ]) ;
-                        sessionid = (Some client_random) } ;
+          ClientHello (set_ch_ciphersuites Packet.([ TLS_NULL_WITH_NULL_NULL ; TLS_RSA_WITH_NULL_MD5 ; TLS_RSA_WITH_AES_256_CBC_SHA ]) ch |>
+                       set_ch_session_id (Some client_random) ) ;
 
-          ClientHello { ch with extensions = [ `Hostname "foobar" ] } ;
-          ClientHello { ch with extensions = [ `Hostname "foobarblubb" ] } ;
+          ClientHello (set_ch_extensions [ `Hostname "foobar" ] ch) ;
+          ClientHello (set_ch_extensions [ `Hostname "foobarblubb" ] ch) ;
 
-          ClientHello { ch with extensions = [ `Hostname "foobarblubb" ; `SupportedGroups Packet.([SECP521R1; SECP384R1]) ] } ;
+          ClientHello (set_ch_extensions [ `Hostname "foobarblubb" ; `SupportedGroups Packet.([SECP521R1; SECP384R1]) ] ch) ;
 
-          ClientHello { ch with extensions = [ `ALPN ["h2"; "http/1.1"] ] } ;
+          ClientHello (set_ch_extensions [ `ALPN ["h2"; "http/1.1"] ] ch) ;
 
-          ClientHello { ch with extensions = [
+          ClientHello (set_ch_extensions [
                              `Hostname "foobarblubb" ;
                              `SupportedGroups Packet.([SECP521R1; SECP384R1]) ;
                              `SignatureAlgorithms [`RSA_PKCS1_MD5] ;
                              `ALPN ["h2"; "http/1.1"]
-                           ] } ;
+                           ] ch);
 
-          ClientHello { ch with
-                        ciphersuites = Packet.([ TLS_NULL_WITH_NULL_NULL ; TLS_RSA_WITH_NULL_MD5 ; TLS_RSA_WITH_AES_256_CBC_SHA ]) ;
-                        sessionid = (Some client_random) ;
-                        extensions = [ `Hostname "foobarblubb" ] } ;
+          ClientHello (set_ch_ciphersuites Packet.([ TLS_NULL_WITH_NULL_NULL ; TLS_RSA_WITH_NULL_MD5 ; TLS_RSA_WITH_AES_256_CBC_SHA ]) ch |>
+                       set_ch_session_id (Some client_random) |>
+                       set_ch_extensions [ `Hostname "foobarblubb" ]) ;
 
-          ClientHello { ch with
-                        ciphersuites = Packet.([ TLS_NULL_WITH_NULL_NULL ; TLS_RSA_WITH_NULL_MD5 ; TLS_RSA_WITH_AES_256_CBC_SHA ]) ;
-                        sessionid = (Some client_random) ;
-                        extensions = [
+          ClientHello (set_ch_ciphersuites Packet.([ TLS_NULL_WITH_NULL_NULL ; TLS_RSA_WITH_NULL_MD5 ; TLS_RSA_WITH_AES_256_CBC_SHA ]) ch |>
+                       set_ch_session_id (Some client_random) |>
+                       set_ch_extensions [
                              `Hostname "foobarblubb" ;
                              `SupportedGroups Packet.([SECP521R1; SECP384R1]) ;
                              `SignatureAlgorithms [`RSA_PKCS1_SHA1; `RSA_PKCS1_SHA512] ;
                              `ALPN ["h2"; "http/1.1"]
-                      ] } ;
+                      ] ) ;
 
-          ClientHello { ch with
-                        ciphersuites = Packet.([ TLS_NULL_WITH_NULL_NULL ; TLS_RSA_WITH_NULL_MD5 ; TLS_RSA_WITH_AES_256_CBC_SHA ]) ;
-                        sessionid = (Some client_random) ;
-                        extensions = [
+          ClientHello (set_ch_ciphersuites Packet.([ TLS_NULL_WITH_NULL_NULL ; TLS_RSA_WITH_NULL_MD5 ; TLS_RSA_WITH_AES_256_CBC_SHA ]) ch |>
+                       set_ch_session_id (Some client_random) |>
+                       set_ch_extensions [
                              `Hostname "foobarblubb" ;
                              `SupportedGroups Packet.([SECP521R1; SECP384R1]) ;
                              `SignatureAlgorithms [`RSA_PKCS1_MD5; `RSA_PKCS1_SHA256] ;
                              `SecureRenegotiation client_random ;
                              `ALPN ["h2"; "http/1.1"]
-                      ] } ;
+                      ] ) ;
 
         ])
 

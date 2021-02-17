@@ -82,7 +82,7 @@ let default_client_hello config =
     extensions     = `ExtendedMasterSecret :: host @ extensions @ alpn
   }
   in
-  (ch, version, secrets)
+  (`TLS ch, version, secrets)
 
 let common_server_hello_validation config reneg (sh : server_hello) (ch : client_hello) =
   let validate_reneg data =
@@ -95,7 +95,7 @@ let common_server_hello_validation config reneg (sh : server_hello) (ch : client
   guard (List.mem sh.ciphersuite config.ciphers)
     (`Error (`NoConfiguredCiphersuite [sh.ciphersuite])) >>= fun () ->
   guard (server_hello_valid sh &&
-         server_exts_subset_of_client sh.extensions ch.extensions)
+         server_exts_subset_of_client sh.extensions (get_ch_extensions ch))
     (`Fatal `InvalidServerHello) >>= fun () ->
   (match get_alpn_protocol sh with
    | None -> return ()
@@ -107,7 +107,7 @@ let common_server_hello_machina state (sh : server_hello) (ch : client_hello) ra
   let cipher = sh.ciphersuite in
   let session_id = match sh.sessionid with None -> Cstruct.create 0 | Some x -> x in
   let extended_ms =
-    List.mem `ExtendedMasterSecret ch.extensions &&
+    List.mem `ExtendedMasterSecret (get_ch_extensions ch) &&
     List.mem `ExtendedMasterSecret sh.extensions
   in
   let alpn_protocol = get_alpn_protocol sh in
@@ -115,7 +115,7 @@ let common_server_hello_machina state (sh : server_hello) (ch : client_hello) ra
     let session = empty_session in
     let common_session_data = {
       session.common_session_data with
-      client_random    = ch.client_random ;
+      client_random    = get_ch_random ch ;
       server_random    = sh.server_random ;
       alpn_protocol ;
     } in {
@@ -124,7 +124,7 @@ let common_server_hello_machina state (sh : server_hello) (ch : client_hello) ra
       ciphersuite      = cipher ;
       session_id ;
       extended_ms ;
-      client_version   = ch.client_version ;
+      client_version   = get_ch_version ch ;
     }
   in
   let state = { state with protocol_version = (version_to_tls sh.server_version) } in
@@ -147,7 +147,7 @@ let answer_server_hello state (ch : client_hello) sh secrets raw log =
 
   let cfg = state.config in
   common_server_hello_validation cfg None sh ch >>= fun () ->
-  validate_version ch.client_version state.config.protocol_versions sh.server_version >>= fun () ->
+  validate_version (get_ch_version ch) state.config.protocol_versions sh.server_version >>= fun () ->
 
   (if max_protocol_version state.config.protocol_versions = `TLS_1_3 then
      let piece = Cstruct.sub sh.server_random 24 8 in
@@ -178,13 +178,13 @@ let answer_server_hello state (ch : client_hello) sh secrets raw log =
         let session = session_of_epoch epoch in
         let common_session_data = {
           session.common_session_data with
-          client_random = ch.client_random ;
+          client_random = (get_ch_random ch) ;
           server_random = sh.server_random ;
           client_auth = match epoch.own_certificate with [] -> false | _ -> true ;
         } in
         { session with
           common_session_data ;
-          client_version = ch.client_version ;
+          client_version = (get_ch_version ch) ;
         }
       in
       let client_ctx, server_ctx =
@@ -426,7 +426,7 @@ let answer_server_finished_resume state (session : session_data) fin raw log =
 let answer_hello_request state =
   let produce_client_hello session config exts =
      let dch, _, _ = default_client_hello config in
-     let ch = { dch with extensions = dch.extensions @ exts ; sessionid = None } in
+     let ch = set_ch_extensions (get_ch_extensions dch @ exts) dch |> set_ch_session_id None in 
      let raw = Writer.assemble_handshake (ClientHello ch) in
      let machina = AwaitServerHelloRenegotiate (session, ch, [raw]) in
      Tracing.sexpf ~tag:"handshake-out" ~f:sexp_of_tls_handshake (ClientHello ch) ;
