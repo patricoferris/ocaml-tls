@@ -467,28 +467,30 @@ let assemble_key_update req =
   set_uint8 cs 0 (key_update_request_type_to_int req);
   cs
 
+let assemble_handshake_type = function 
+  | ClientHello ch -> (assemble_client_hello ch, CLIENT_HELLO)
+  | ServerHello sh -> (assemble_server_hello sh, SERVER_HELLO)
+  | HelloRetryRequest hr -> (assemble_hello_retry_request hr, SERVER_HELLO)
+  | Certificate cs -> (cs, CERTIFICATE)
+  | CertificateRequest cr -> (cr, CERTIFICATE_REQUEST)
+  | CertificateVerify c -> (c, CERTIFICATE_VERIFY)
+  | ServerKeyExchange kex -> (kex, SERVER_KEY_EXCHANGE)
+  | ClientKeyExchange kex -> (kex, CLIENT_KEY_EXCHANGE)
+  | ServerHelloDone -> (create 0, SERVER_HELLO_DONE)
+  | HelloRequest -> (create 0, HELLO_REQUEST)
+  | Finished fs -> (fs, FINISHED)
+  | SessionTicket st -> (assemble_session_ticket st, SESSION_TICKET)
+  | EncryptedExtensions ee ->
+    let cs = assemble_extensions assemble_encrypted_extension ee in
+    (cs, ENCRYPTED_EXTENSIONS)
+  | KeyUpdate req ->
+    let cs = assemble_key_update req in
+    (cs, KEY_UPDATE)
+  | EndOfEarlyData -> (create 0, END_OF_EARLY_DATA)
+
 let assemble_handshake hs =
   let (payload, payload_type) =
-    match hs with
-    | ClientHello ch -> (assemble_client_hello ch, CLIENT_HELLO)
-    | ServerHello sh -> (assemble_server_hello sh, SERVER_HELLO)
-    | HelloRetryRequest hr -> (assemble_hello_retry_request hr, SERVER_HELLO)
-    | Certificate cs -> (cs, CERTIFICATE)
-    | CertificateRequest cr -> (cr, CERTIFICATE_REQUEST)
-    | CertificateVerify c -> (c, CERTIFICATE_VERIFY)
-    | ServerKeyExchange kex -> (kex, SERVER_KEY_EXCHANGE)
-    | ClientKeyExchange kex -> (kex, CLIENT_KEY_EXCHANGE)
-    | ServerHelloDone -> (create 0, SERVER_HELLO_DONE)
-    | HelloRequest -> (create 0, HELLO_REQUEST)
-    | Finished fs -> (fs, FINISHED)
-    | SessionTicket st -> (assemble_session_ticket st, SESSION_TICKET)
-    | EncryptedExtensions ee ->
-       let cs = assemble_extensions assemble_encrypted_extension ee in
-       (cs, ENCRYPTED_EXTENSIONS)
-    | KeyUpdate req ->
-      let cs = assemble_key_update req in
-      (cs, KEY_UPDATE)
-    | EndOfEarlyData -> (create 0, END_OF_EARLY_DATA)
+    assemble_handshake_type hs
   in
   let pay_len = len payload in
   let buf = assemble_hs payload_type pay_len in

@@ -20,6 +20,8 @@ val parse_record      : Cstruct.t ->
   | `Fragment of Cstruct.t
   ] result
 
+val parse_server_hello : Cstruct.t -> Core.tls_handshake
+
 val parse_handshake_frame : Cstruct.t -> (Cstruct.t option * Cstruct.t)
 val parse_handshake : Cstruct.t -> Core.tls_handshake result
 
@@ -33,6 +35,12 @@ val parse_certificate_request_1_3 : Cstruct.t -> (Cstruct.t option * Core.certif
 
 val parse_certificates : Cstruct.t -> Cstruct.t list result
 val parse_certificates_1_3 : Cstruct.t -> (Cstruct.t * (Cstruct.t * 'a list) list) result
+
+val parse_extensions : (Cstruct.t -> 'a option * Cstruct.t) -> Cstruct.t -> 'a list
+val parse_client_extension : Cstruct.t -> Core.client_extension option * Cstruct.t
+
+val parse_any_ciphersuites : Cstruct.t -> Packet.any_ciphersuite list * Cstruct.t 
+val parse_compression_methods : Cstruct.t -> Packet.compression_method list * Cstruct.t 
 
 val parse_client_dh_key_exchange : Cstruct.t -> Cstruct.t result
 val parse_client_ec_key_exchange : Cstruct.t -> Cstruct.t result
